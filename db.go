@@ -164,3 +164,12 @@ func GetCategoriesFromDB(db *gorm.DB) ([]Category, error) {
 	}
 	return categories, nil
 }
+
+func GetSubCategoriesFromDB(db *gorm.DB) ([]Subcategory, error) {
+	var subcategories []Subcategory
+	if err := db.Find(&subcategories).Error; err != nil {
+		log.Printf("Error fetching subcategories from DB: %v", err)
+		return nil, err
+	}
+	return subcategories, nil
+}

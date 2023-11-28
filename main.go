@@ -32,23 +32,24 @@ func main() {
 	}
 
 	for update := range updates {
-		if update.Message == nil {
-			continue
-		}
+		if update.CallbackQuery != nil {
+			HandleCallbackQuery(bot, db, update.CallbackQuery)
+		} else if update.Message != nil {
 
-		userID := update.Message.From.ID
+			userID := update.Message.From.ID
 
-		isSubscribed, err := CheckSubscriptionStatus(bot, db, channelID, int64(userID))
-		if err != nil {
-			log.Printf("Error checking subscription status: %v", err)
-			continue
-		}
+			isSubscribed, err := CheckSubscriptionStatus(bot, db, channelID, int64(userID))
+			if err != nil {
+				log.Printf("Error checking subscription status: %v", err)
+				continue
+			}
 
-		if isSubscribed {
-			WelcomeMessage(bot, update.Message.Chat.ID)
-			SendPromotionMessage(bot, update.Message.Chat.ID, db)
-		} else {
-			SendSubscriptionMessage(bot, update.Message.Chat.ID)
+			if isSubscribed {
+				WelcomeMessage(bot, update.Message.Chat.ID)
+				SendPromotionMessage(bot, update.Message.Chat.ID, db)
+			} else {
+				SendSubscriptionMessage(bot, update.Message.Chat.ID)
+			}
 		}
 	}
 }
