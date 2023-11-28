@@ -19,6 +19,10 @@ func main() {
 		log.Panic(err)
 	}
 
+	go UpdateCategoriesInDB(db)
+	go UpdateSubcategoriesInDB(db)
+	go UpdateServicesInDB(db)
+
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
@@ -42,7 +46,7 @@ func main() {
 
 		if isSubscribed {
 			WelcomeMessage(bot, update.Message.Chat.ID)
-			SendPromotionMessage(bot, update.Message.Chat.ID)
+			SendPromotionMessage(bot, update.Message.Chat.ID, db)
 		} else {
 			SendSubscriptionMessage(bot, update.Message.Chat.ID)
 		}
