@@ -2,18 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
-	"time"
 )
 
 const (
-	apiCategoriesEndpoint       = "https://api.stagesmm.com/categories"
-	apiSubcategoriesEndpoint    = "https://api.stagesmm.com/subcategories/"
-	apiServicesEndpointFormat   = "https://api.stagesmm.com/services?search=&limit=25000&category_id=apiSubcategoriesEndpoint&pagination=1&order=DESC&order_by=id"
-	updateCategoriesInterval    = time.Hour
-	updateSubcategoriesInterval = time.Hour
-	updateServicesInterval      = time.Hour
+	apiCategoriesEndpoint     = "https://api.stagesmm.com/categories"
+	apiSubcategoriesEndpoint  = "https://api.stagesmm.com/subcategories/"
+	apiServicesEndpointFormat = "https://api.stagesmm.com/services?search=&limit=25000&category_id=%s&pagination=1&order=DESC&order_by=id"
 )
 
 func fetchCategoriesFromAPI() ([]Category, error) {
@@ -59,7 +56,9 @@ func fetchSubcategoriesFromAPI(categoryID string) ([]Subcategory, error) {
 }
 
 func fetchServicesFromAPI(subcategoryID string) ([]APIService, error) {
-	resp, err := http.Get(apiServicesEndpointFormat)
+	// Используем fmt.Sprintf для подстановки идентификатора подкатегории в URL
+	apiUrl := fmt.Sprintf(apiServicesEndpointFormat, subcategoryID)
+	resp, err := http.Get(apiUrl)
 	if err != nil {
 		return nil, err
 	}

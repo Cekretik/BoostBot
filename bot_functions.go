@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
-	"strings"
+	"strconv"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"gorm.io/gorm"
@@ -35,7 +35,21 @@ func SendPromotionMessage(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 
 	msg := tgbotapi.NewMessage(chatID, messageText)
 
-	keyboard, err := CreatePromotionKeyboard(db, false, "")
+	itemsPerPage := 10
+
+	// Используем ID категории (пустая строка, если необходимы все подкатегории)
+	categoryID := ""
+
+	totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, categoryID)
+	if err != nil {
+		log.Println("Error getting total pages:", err)
+		return
+	}
+
+	// Изначально устанавливаем текущую страницу в 1
+	currentPage := "1"
+
+	keyboard, err := CreatePromotionKeyboard(db, false, categoryID, currentPage, strconv.Itoa(totalPages))
 	if err != nil {
 		log.Println("Error creating promotion keyboard:", err)
 		// В случае ошибки создания клавиатуры, просто отправим сообщение без нее
@@ -52,7 +66,7 @@ func SendPromotionMessage(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	}
 }
 
-func CreatePromotionKeyboard(db *gorm.DB, showSubcategories bool, categoryID string) (tgbotapi.InlineKeyboardMarkup, error) {
+func CreatePromotionKeyboard(db *gorm.DB, showSubcategories bool, categoryID, currentPage, totalPages string) (tgbotapi.InlineKeyboardMarkup, error) {
 	var rows [][]tgbotapi.InlineKeyboardButton
 
 	if !showSubcategories {
@@ -74,38 +88,28 @@ func CreatePromotionKeyboard(db *gorm.DB, showSubcategories bool, categoryID str
 			return tgbotapi.InlineKeyboardMarkup{}, err
 		}
 
-		for _, subcategory := range subcategories {
+		// Разбиваем подкатегории на страницы
+		totalPagesInt, err := strconv.Atoi(totalPages)
+		if err != nil {
+			// Обработка ошибки конвертации строки в число
+			return tgbotapi.InlineKeyboardMarkup{}, err
+		}
+
+		// Разбиваем подкатегории на страницы
+		itemsPerPage := 10
+		startIdx, endIdx := calculatePageRange(len(subcategories), itemsPerPage, currentPage, totalPagesInt)
+
+		for i := startIdx; i < endIdx; i++ {
+			subcategory := subcategories[i]
 			button := tgbotapi.NewInlineKeyboardButtonData(subcategory.Name, fmt.Sprintf("subcategory:%s", subcategory.ID))
 			row := []tgbotapi.InlineKeyboardButton{button}
 			rows = append(rows, row)
 		}
+
+		// Добавляем кнопки "вперед" и "назад" и информацию о текущей странице
+		paginationRow := createPaginationRow(categoryID, currentPage, totalPages)
+		rows = append(rows, paginationRow.InlineKeyboard...)
 	}
 
 	return tgbotapi.NewInlineKeyboardMarkup(rows...), nil
-}
-
-func HandleCallbackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery *tgbotapi.CallbackQuery) {
-	// Проверка и обработка данных callbackQuery
-	if strings.HasPrefix(callbackQuery.Data, "category:") {
-		categoryID := strings.TrimPrefix(callbackQuery.Data, "category:")
-
-		// Создание новой клавиатуры для подкатегорий
-		keyboard, err := CreatePromotionKeyboard(db, true, categoryID)
-		if err != nil {
-			log.Println("Error creating promotion keyboard:", err)
-			return
-		}
-
-		// Обновление сообщения с новой клавиатурой
-		editMsg := tgbotapi.NewEditMessageReplyMarkup(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID, keyboard)
-		bot.Send(editMsg)
-	}
-}
-
-func GetSubcategoriesByCategoryID(db *gorm.DB, categoryID string) ([]Subcategory, error) {
-	var subcategories []Subcategory
-	if err := db.Where("category_id = ?", categoryID).Find(&subcategories).Error; err != nil {
-		return nil, err
-	}
-	return subcategories, nil
 }

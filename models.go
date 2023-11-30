@@ -28,7 +28,6 @@ type Subcategory struct {
 
 type APIService struct {
 	gorm.Model
-	SubcategoryID    string      `gorm:"column:subcategory_id" json:"subcategory_id"`
 	ID               string      `gorm:"column:service_id" json:"id"`
 	Name             string      `gorm:"column:name" json:"name"`
 	ServiceID        string      `gorm:"column:serviceId" json:"serviceId"`
@@ -42,7 +41,6 @@ type APIService struct {
 	Refill           bool        `gorm:"column:refill" json:"refill"`
 	Cancel           bool        `gorm:"column:cancel" json:"cancel"`
 	AverageTimestamp *time.Time  `gorm:"column:average_timestamp" json:"averageTimestamp"`
-	CreatedAt        time.Time   `gorm:"column:createdAt" json:"createdAt"`
-	UpdatedAt        time.Time   `gorm:"column:updatedAt" json:"updatedAt"`
-	Subcategory      Subcategory `gorm:"foreignkey:SubcategoryID"`
+	SubcategoryID    string      `gorm:"column:subcategory_id" json:"subcategory_id"`
+	Subcategory      Subcategory `gorm:"foreignKey:SubcategoryID" json:"subcategory"`
 }

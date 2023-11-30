@@ -19,8 +19,10 @@ func main() {
 		log.Panic(err)
 	}
 
-	go UpdateCategoriesInDB(db)
-	go UpdateSubcategoriesInDB(db)
+	doneCategories := make(chan bool)
+
+	go UpdateCategoriesInDB(db, doneCategories)
+	go UpdateSubcategoriesInDB(db, doneCategories)
 	go UpdateServicesInDB(db)
 
 	u := tgbotapi.NewUpdate(0)
@@ -30,14 +32,14 @@ func main() {
 	if err != nil {
 		log.Panic(err)
 	}
+	itemsPerPage := 10
 
 	for update := range updates {
 		if update.CallbackQuery != nil {
-			HandleCallbackQuery(bot, db, update.CallbackQuery)
+			totalPages, _ := GetTotalPagesForCategory(db, itemsPerPage, update.CallbackQuery.Data)
+			HandleCallbackQuery(bot, db, update.CallbackQuery, totalPages)
 		} else if update.Message != nil {
-
 			userID := update.Message.From.ID
-
 			isSubscribed, err := CheckSubscriptionStatus(bot, db, channelID, int64(userID))
 			if err != nil {
 				log.Printf("Error checking subscription status: %v", err)
