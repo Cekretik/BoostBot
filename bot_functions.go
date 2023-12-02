@@ -89,15 +89,10 @@ func CreatePromotionKeyboard(db *gorm.DB, showSubcategories bool, categoryID, cu
 		}
 
 		// Разбиваем подкатегории на страницы
-		totalPagesInt, err := strconv.Atoi(totalPages)
-		if err != nil {
-			// Обработка ошибки конвертации строки в число
-			return tgbotapi.InlineKeyboardMarkup{}, err
-		}
 
 		// Разбиваем подкатегории на страницы
 		itemsPerPage := 10
-		startIdx, endIdx := calculatePageRange(len(subcategories), itemsPerPage, currentPage, totalPagesInt)
+		startIdx, endIdx := calculatePageRange(len(subcategories), itemsPerPage, currentPage)
 
 		for i := startIdx; i < endIdx; i++ {
 			subcategory := subcategories[i]
@@ -108,7 +103,7 @@ func CreatePromotionKeyboard(db *gorm.DB, showSubcategories bool, categoryID, cu
 
 		// Добавляем кнопки "вперед" и "назад" и информацию о текущей странице
 		paginationRow := createPaginationRow(categoryID, currentPage, totalPages)
-		rows = append(rows, paginationRow.InlineKeyboard...)
+		rows = append(rows, paginationRow)
 	}
 
 	return tgbotapi.NewInlineKeyboardMarkup(rows...), nil
