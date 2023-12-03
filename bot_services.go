@@ -55,7 +55,7 @@ func fetchSubcategoriesFromAPI(categoryID string) ([]Subcategory, error) {
 	return subcategories, nil
 }
 
-func fetchServicesFromAPI(subcategoryID string) ([]APIService, error) {
+func fetchServicesFromAPI(subcategoryID string) ([]Service, error) {
 	// Используем fmt.Sprintf для подстановки идентификатора подкатегории в URL
 	apiUrl := fmt.Sprintf(apiServicesEndpointFormat, subcategoryID)
 	resp, err := http.Get(apiUrl)
@@ -69,7 +69,7 @@ func fetchServicesFromAPI(subcategoryID string) ([]APIService, error) {
 		return nil, err
 	}
 
-	var services []APIService
+	var services []Service
 	err = json.Unmarshal(body, &services)
 	if err != nil {
 		return nil, err

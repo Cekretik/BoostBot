@@ -22,7 +22,7 @@ func InitDB() (*gorm.DB, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&UserState{}, &Category{}, &Subcategory{}, &APIService{})
+	err = db.AutoMigrate(&UserState{}, &Category{}, &Subcategory{}, &Service{})
 	if err != nil {
 		return nil, err
 	}
@@ -110,8 +110,9 @@ func UpdateCategoriesInDB(db *gorm.DB, done chan bool) {
 }
 
 func UpdateSubcategoriesInDB(db *gorm.DB, done chan bool) {
-	<-done // Ожидание сигнала должно быть здесь, а не в цикле
+	// Ожидание сигнала должно быть здесь, а не в цикле
 	for {
+		<-done
 		var categories []Category
 		db.Find(&categories)
 
@@ -148,8 +149,10 @@ func UpdateSubcategoriesInDB(db *gorm.DB, done chan bool) {
 	}
 }
 
-func UpdateServicesInDB(db *gorm.DB) {
+func UpdateServicesInDB(db *gorm.DB, done chan bool) {
+
 	for {
+		<-done
 		var subcategories []Subcategory
 		db.Find(&subcategories)
 
@@ -250,8 +253,8 @@ func updateSubcategory(tx *gorm.DB, newSubcategory Subcategory) error {
 	return nil
 }
 
-func updateAPIService(tx *gorm.DB, newService APIService) error {
-	var existingService APIService
+func updateAPIService(tx *gorm.DB, newService Service) error {
+	var existingService Service
 	result := tx.Where("service_id = ?", newService.ServiceID).First(&existingService)
 
 	if result.Error != nil {

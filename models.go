@@ -26,7 +26,7 @@ type Subcategory struct {
 	CategoryID string `gorm:"column:category_id" json:"categoryId"`
 }
 
-type APIService struct {
+type Service struct {
 	gorm.Model
 	ID               string      `gorm:"column:service_id" json:"id"`
 	Name             string      `gorm:"column:name" json:"name"`

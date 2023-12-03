@@ -23,7 +23,7 @@ func main() {
 
 	go UpdateCategoriesInDB(db, doneCategories)
 	go UpdateSubcategoriesInDB(db, doneCategories)
-	go UpdateServicesInDB(db)
+	go UpdateServicesInDB(db, doneCategories)
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
