@@ -63,7 +63,6 @@ func UpdateUserSubscriptionStatus(db *gorm.DB, userID, channelID int64, subscrib
 		return err
 	}
 
-	// Проверяем, изменился ли статус подписки
 	if userState.Subscribed != subscribed {
 		userState.Subscribed = subscribed
 		if err := db.Save(userState).Error; err != nil {
@@ -101,7 +100,7 @@ func UpdateCategoriesInDB(db *gorm.DB, done chan bool) {
 				log.Printf("Error committing transaction for categories: %v", err)
 			} else {
 				log.Println("Categories updated in the database.")
-				done <- true // Посылать сигнал только после успешного обновления
+				done <- true
 			}
 		}
 
@@ -110,7 +109,6 @@ func UpdateCategoriesInDB(db *gorm.DB, done chan bool) {
 }
 
 func UpdateSubcategoriesInDB(db *gorm.DB, done chan bool) {
-	// Ожидание сигнала должно быть здесь, а не в цикле
 	for {
 		<-done
 		var categories []Category
@@ -150,7 +148,6 @@ func UpdateSubcategoriesInDB(db *gorm.DB, done chan bool) {
 }
 
 func UpdateServicesInDB(db *gorm.DB, done chan bool) {
-
 	for {
 		<-done
 		var subcategories []Subcategory
@@ -171,7 +168,7 @@ func UpdateServicesInDB(db *gorm.DB, done chan bool) {
 			}()
 
 			for _, service := range services {
-				if err := updateAPIService(tx, service); err != nil {
+				if err := updateService(tx, service); err != nil {
 					log.Printf("Error updating service with ID %s: %v", service.ServiceID, err)
 					tx.Rollback()
 					break
@@ -208,12 +205,31 @@ func GetSubCategoriesFromDB(db *gorm.DB) ([]Subcategory, error) {
 	return subcategories, nil
 }
 
+func GetServicesFromDB(db *gorm.DB) ([]Service, error) {
+	var services []Service
+	if err := db.Find(&services).Error; err != nil {
+		log.Printf("Error fetching services from DB: %v", err)
+		return nil, err
+	}
+	return services, nil
+}
+
+// Get subcategories by category ID
 func GetSubcategoriesByCategoryID(db *gorm.DB, categoryID string) ([]Subcategory, error) {
 	var subcategories []Subcategory
 	if err := db.Where("category_id = ?", categoryID).Find(&subcategories).Error; err != nil {
 		return nil, err
 	}
 	return subcategories, nil
+}
+
+// Get services by subcategory ID
+func GetServicesBySubcategoryID(db *gorm.DB, subcategoryID string) ([]Service, error) {
+	var services []Service
+	if err := db.Where("subcategory_id = ?", subcategoryID).Find(&services).Error; err != nil {
+		return nil, err
+	}
+	return services, nil
 }
 
 // Updating category, subcategory and service
@@ -253,7 +269,7 @@ func updateSubcategory(tx *gorm.DB, newSubcategory Subcategory) error {
 	return nil
 }
 
-func updateAPIService(tx *gorm.DB, newService Service) error {
+func updateService(tx *gorm.DB, newService Service) error {
 	var existingService Service
 	result := tx.Where("service_id = ?", newService.ServiceID).First(&existingService)
 
@@ -265,9 +281,18 @@ func updateAPIService(tx *gorm.DB, newService Service) error {
 	}
 
 	// Сравниваем и обновляем поля, если это необходимо
-	if existingService.Name != newService.Name || existingService.Rate != newService.Rate ||
-		existingService.Min != newService.Min || existingService.Max != newService.Max {
-		return tx.Model(&existingService).Updates(newService).Error
+	if existingService.ID != newService.ID ||
+		existingService.Name != newService.Name ||
+		existingService.Type != newService.Type ||
+		existingService.Rate != newService.Rate ||
+		existingService.Min != newService.Min ||
+		existingService.Max != newService.Max ||
+		existingService.Dripfeed != newService.Dripfeed ||
+		existingService.Refill != newService.Refill ||
+		existingService.Cancel != newService.Cancel ||
+		existingService.SubcategoryID != newService.SubcategoryID {
+		return tx.Model(&existingService).Updates(Service{ID: newService.ID, Name: newService.Name, CategoryID: newService.CategoryID, Rate: newService.Rate, Min: newService.Min,
+			Max: newService.Max, Dripfeed: newService.Dripfeed, Refill: newService.Refill, Cancel: newService.Cancel, CreatedAt: newService.CreatedAt, UpdatedAt: newService.UpdatedAt, SubcategoryID: newService.SubcategoryID}).Error
 	}
 
 	return nil

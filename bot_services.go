@@ -10,7 +10,7 @@ import (
 const (
 	apiCategoriesEndpoint     = "https://api.stagesmm.com/categories"
 	apiSubcategoriesEndpoint  = "https://api.stagesmm.com/subcategories/"
-	apiServicesEndpointFormat = "https://api.stagesmm.com/services?search=&limit=25000&category_id=%s&pagination=1&order=DESC&order_by=id"
+	apiServicesEndpointFormat = "https://api.stagesmm.com/services?search=&limit=25000&subcategory_id=%s&pagination=1&order=DESC&order_by=id"
 )
 
 func fetchCategoriesFromAPI() ([]Category, error) {
@@ -56,7 +56,6 @@ func fetchSubcategoriesFromAPI(categoryID string) ([]Subcategory, error) {
 }
 
 func fetchServicesFromAPI(subcategoryID string) ([]Service, error) {
-	// Используем fmt.Sprintf для подстановки идентификатора подкатегории в URL
 	apiUrl := fmt.Sprintf(apiServicesEndpointFormat, subcategoryID)
 	resp, err := http.Get(apiUrl)
 	if err != nil {
@@ -69,9 +68,12 @@ func fetchServicesFromAPI(subcategoryID string) ([]Service, error) {
 		return nil, err
 	}
 
+	fmt.Println(string(body))
+
 	var services []Service
 	err = json.Unmarshal(body, &services)
 	if err != nil {
+		fmt.Println("Error unmarshalling JSON:", err)
 		return nil, err
 	}
 
