@@ -25,6 +25,8 @@ func fetchCategoriesFromAPI() ([]Category, error) {
 		return nil, err
 	}
 
+	//fmt.Println(string(body))
+
 	var categories []Category
 	err = json.Unmarshal(body, &categories)
 	if err != nil {
@@ -45,6 +47,8 @@ func fetchSubcategoriesFromAPI(categoryID string) ([]Subcategory, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	//fmt.Println(string(body))
 
 	var subcategories []Subcategory
 	err = json.Unmarshal(body, &subcategories)

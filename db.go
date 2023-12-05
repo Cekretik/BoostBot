@@ -271,7 +271,7 @@ func updateSubcategory(tx *gorm.DB, newSubcategory Subcategory) error {
 
 func updateService(tx *gorm.DB, newService Service) error {
 	var existingService Service
-	result := tx.Where("service_id = ?", newService.ServiceID).First(&existingService)
+	result := tx.Where("service_id = ?", newService.ID).First(&existingService)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -280,7 +280,6 @@ func updateService(tx *gorm.DB, newService Service) error {
 		return result.Error
 	}
 
-	// Сравниваем и обновляем поля, если это необходимо
 	if existingService.ID != newService.ID ||
 		existingService.Name != newService.Name ||
 		existingService.Type != newService.Type ||
@@ -292,7 +291,7 @@ func updateService(tx *gorm.DB, newService Service) error {
 		existingService.Cancel != newService.Cancel ||
 		existingService.SubcategoryID != newService.SubcategoryID {
 		return tx.Model(&existingService).Updates(Service{ID: newService.ID, Name: newService.Name, CategoryID: newService.CategoryID, Rate: newService.Rate, Min: newService.Min,
-			Max: newService.Max, Dripfeed: newService.Dripfeed, Refill: newService.Refill, Cancel: newService.Cancel, CreatedAt: newService.CreatedAt, UpdatedAt: newService.UpdatedAt, SubcategoryID: newService.SubcategoryID}).Error
+			Max: newService.Max, Dripfeed: newService.Dripfeed, Refill: newService.Refill, Cancel: newService.Cancel, SubcategoryID: newService.SubcategoryID}).Error
 	}
 
 	return nil
