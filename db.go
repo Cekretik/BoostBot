@@ -149,7 +149,7 @@ func UpdateSubcategoriesInDB(db *gorm.DB, done chan bool) {
 
 func UpdateServicesInDB(db *gorm.DB, done chan bool) {
 	for {
-		<-done
+		// <-done
 		var subcategories []Subcategory
 		db.Find(&subcategories)
 
@@ -271,7 +271,7 @@ func updateSubcategory(tx *gorm.DB, newSubcategory Subcategory) error {
 
 func updateService(tx *gorm.DB, newService Service) error {
 	var existingService Service
-	result := tx.Where("service_id = ?", newService.ID).First(&existingService)
+	result := tx.Where("service_id = ?", newService.ServiceID).First(&existingService)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -287,7 +287,6 @@ func updateService(tx *gorm.DB, newService Service) error {
 		existingService.Dripfeed != newService.Dripfeed ||
 		existingService.Refill != newService.Refill ||
 		existingService.Cancel != newService.Cancel ||
-		existingService.ServiceID != newService.ServiceID ||
 		existingService.Rate != newService.Rate ||
 		existingService.Type != newService.Type ||
 		existingService.ServiceType != newService.ServiceType ||
@@ -295,8 +294,8 @@ func updateService(tx *gorm.DB, newService Service) error {
 		existingService.CreatedAt != newService.CreatedAt ||
 		existingService.UpdatedAt != newService.UpdatedAt {
 		return tx.Model(&existingService).Updates(Service{Name: newService.Name, CategoryID: newService.CategoryID, Min: newService.Min,
-			Max: newService.Max, Dripfeed: newService.Dripfeed, Refill: newService.Refill, Cancel: newService.Cancel, ServiceID: newService.ServiceID,
-			Rate: newService.Rate, Type: newService.Type, ServiceType: newService.ServiceType, AverageTimestamp: newService.AverageTimestamp,
+			Max: newService.Max, Dripfeed: newService.Dripfeed, Refill: newService.Refill, Cancel: newService.Cancel, Rate: newService.Rate,
+			Type: newService.Type, ServiceType: newService.ServiceType, AverageTimestamp: newService.AverageTimestamp,
 			CreatedAt: newService.CreatedAt, UpdatedAt: newService.UpdatedAt}).Error
 	}
 

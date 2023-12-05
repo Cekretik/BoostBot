@@ -72,7 +72,7 @@ func fetchServicesFromAPI(subcategoryID string) ([]Service, error) {
 		return nil, err
 	}
 
-	fmt.Println(string(body))
+	//fmt.Println(string(body))
 
 	var services []Service
 	err = json.Unmarshal(body, &services)
