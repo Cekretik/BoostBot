@@ -36,7 +36,7 @@ func main() {
 
 	for update := range updates {
 		if update.CallbackQuery != nil {
-			totalPages, _ := GetTotalPagesForCategory(db, itemsPerPage, update.CallbackQuery.Data)
+			totalPages, _ := GetTotalPagesForSubcategory(db, itemsPerPage, update.CallbackQuery.Data)
 			HandleCallbackQuery(bot, db, update.CallbackQuery, totalPages)
 		} else if update.Message != nil {
 			userID := update.Message.From.ID

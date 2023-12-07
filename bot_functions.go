@@ -38,7 +38,7 @@ func SendPromotionMessage(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 
 	categoryID := ""
 
-	totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, categoryID)
+	totalPages, err := GetTotalPagesForSubcategory(db, itemsPerPage, categoryID)
 	if err != nil {
 		log.Println("Error getting total pages:", err)
 		return

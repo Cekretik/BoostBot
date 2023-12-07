@@ -16,7 +16,7 @@ func HandleCallbackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery *tgbot
 	if strings.HasPrefix(callbackQuery.Data, "category:") {
 		categoryID := strings.TrimPrefix(callbackQuery.Data, "category:")
 
-		totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, categoryID)
+		totalPages, err := GetTotalPagesForSubcategory(db, itemsPerPage, categoryID)
 		if err != nil {
 			log.Println("Error calculating total pages:", err)
 			return
@@ -46,7 +46,7 @@ func HandleCallbackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery *tgbot
 			currentPage = strconv.Itoa(nextPage)
 		}
 
-		totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, categoryID)
+		totalPages, err := GetTotalPagesForSubcategory(db, itemsPerPage, categoryID)
 		if err != nil {
 			log.Println("Error calculating total pages:", err)
 			return
@@ -61,7 +61,7 @@ func HandleCallbackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery *tgbot
 	}
 }
 
-func GetTotalPagesForCategory(db *gorm.DB, itemsPerPage int, categoryID string) (int, error) {
+func GetTotalPagesForSubcategory(db *gorm.DB, itemsPerPage int, categoryID string) (int, error) {
 	var totalSubcategories int64
 	if err := db.Model(&Subcategory{}).Where("category_id = ?", categoryID).Count(&totalSubcategories).Error; err != nil {
 		return 0, err
