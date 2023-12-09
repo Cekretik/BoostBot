@@ -9,6 +9,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var currentPage = ""
+
 func WelcomeMessage(bot *tgbotapi.BotAPI, chatID int64) {
 	messageText := "Добро пожаловать!"
 	msg := tgbotapi.NewMessage(chatID, messageText)
@@ -34,21 +36,17 @@ func SendPromotionMessage(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 
 	msg := tgbotapi.NewMessage(chatID, messageText)
 
-	itemsPerPage := 10
-
 	categoryID := ""
 
-	totalPages, err := GetTotalPagesForSubcategory(db, itemsPerPage, categoryID)
+	totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, categoryID)
 	if err != nil {
 		log.Println("Error getting total pages:", err)
 		return
 	}
 
-	currentPage := "1"
-
-	keyboard, err := CreatePromotionKeyboard(db, false, categoryID, currentPage, strconv.Itoa(totalPages))
+	categoryKeyboard, err := CreateCategoryKeyboard(db)
 	if err != nil {
-		log.Println("Error creating promotion keyboard:", err)
+		log.Println("Error creating category keyboard:", err)
 
 		if _, err := bot.Send(msg); err != nil {
 			log.Println("Error sending promotion message:", err)
@@ -56,47 +54,141 @@ func SendPromotionMessage(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 		return
 	}
 
-	msg.ReplyMarkup = keyboard
+	msg.ReplyMarkup = categoryKeyboard
 	if _, err := bot.Send(msg); err != nil {
 		log.Println("Error sending promotion message:", err)
+		return
+	}
+
+	subcategories, err := GetSubcategoriesByCategoryID(db, categoryID)
+	if err != nil {
+		log.Println("Error getting subcategories:", err)
+		return
+	}
+
+	for _, subcategory := range subcategories {
+		subcategoryMsg := tgbotapi.NewMessage(chatID, subcategory.Name)
+
+		subcategoryKeyboard, err := CreateSubcategoryKeyboard(db, subcategory.ID, currentPage, strconv.Itoa(totalPages))
+		if err != nil {
+			log.Println("Error creating subcategory keyboard:", err)
+			continue
+		}
+
+		subcategoryMsg.ReplyMarkup = subcategoryKeyboard
+		if _, err := bot.Send(subcategoryMsg); err != nil {
+			log.Println("Error sending subcategory message:", err)
+		}
+	}
+
+	subcategoryID := ""
+	totalServicePages, err := GetTotalPagesForService(db, itemsPerPage, categoryID)
+	if err != nil {
+		log.Println("Error getting total pages:", err)
+		return
+	}
+
+	services, err := GetServicesBySubcategoryID(db, subcategoryID)
+	if err != nil {
+		log.Println("Error getting services:", err)
+		return
+	}
+
+	for _, service := range services {
+		serviceMsg := tgbotapi.NewMessage(chatID, service.Name)
+
+		serviceKeyboard, err := CreateServiceKeyboard(db, service.ServiceID, currentPage, strconv.Itoa(totalServicePages))
+		if err != nil {
+			log.Println("Error creating service keyboard:", err)
+			continue
+		}
+
+		serviceMsg.ReplyMarkup = serviceKeyboard
+		if _, err := bot.Send(serviceMsg); err != nil {
+			log.Println("Error sending service message:", err)
+		}
 	}
 }
 
-func CreatePromotionKeyboard(db *gorm.DB, showSubcategories bool, categoryID, currentPage, totalPages string) (tgbotapi.InlineKeyboardMarkup, error) {
+func CreateCategoryKeyboard(db *gorm.DB) (tgbotapi.InlineKeyboardMarkup, error) {
 	var rows [][]tgbotapi.InlineKeyboardButton
 
-	if !showSubcategories {
-
-		categories, err := GetCategoriesFromDB(db)
-		if err != nil {
-			return tgbotapi.InlineKeyboardMarkup{}, err
-		}
-
-		for _, category := range categories {
-			button := tgbotapi.NewInlineKeyboardButtonData(category.Name, fmt.Sprintf("category:%s", category.ID))
-			row := []tgbotapi.InlineKeyboardButton{button}
-			rows = append(rows, row)
-		}
-	} else {
-
-		subcategories, err := GetSubcategoriesByCategoryID(db, categoryID)
-		if err != nil {
-			return tgbotapi.InlineKeyboardMarkup{}, err
-		}
-
-		itemsPerPage := 10
-		startIdx, endIdx := calculatePageRange(len(subcategories), itemsPerPage, currentPage)
-
-		for i := startIdx; i < endIdx; i++ {
-			subcategory := subcategories[i]
-			button := tgbotapi.NewInlineKeyboardButtonData(subcategory.Name, fmt.Sprintf("subcategory:%s", subcategory.ID))
-			row := []tgbotapi.InlineKeyboardButton{button}
-			rows = append(rows, row)
-		}
-
-		paginationRow := createPaginationRow(categoryID, currentPage, totalPages)
-		rows = append(rows, paginationRow)
+	categories, err := GetCategoriesFromDB(db)
+	if err != nil {
+		return tgbotapi.InlineKeyboardMarkup{}, err
 	}
+
+	for _, category := range categories {
+		button := tgbotapi.NewInlineKeyboardButtonData(category.Name, fmt.Sprintf("category:%s", category.ID))
+		row := []tgbotapi.InlineKeyboardButton{button}
+		rows = append(rows, row)
+	}
+
+	return tgbotapi.NewInlineKeyboardMarkup(rows...), nil
+}
+
+func CreateSubcategoryKeyboard(db *gorm.DB, categoryID, currentPage, totalPages string) (tgbotapi.InlineKeyboardMarkup, error) {
+	var rows [][]tgbotapi.InlineKeyboardButton
+
+	subcategories, err := GetSubcategoriesByCategoryID(db, categoryID)
+	if err != nil {
+		return tgbotapi.InlineKeyboardMarkup{}, err
+	}
+
+	startIdx, endIdx := calculatePageRange(len(subcategories), itemsPerPage, currentPage)
+
+	for i := startIdx; i < endIdx; i++ {
+		subcategory := subcategories[i]
+		button := tgbotapi.NewInlineKeyboardButtonData(subcategory.Name, fmt.Sprintf("subcategory:%s", subcategory.ID))
+		row := []tgbotapi.InlineKeyboardButton{button}
+		rows = append(rows, row)
+	}
+
+	totalPagesInt, err := strconv.Atoi(totalPages)
+	if err != nil {
+		return tgbotapi.InlineKeyboardMarkup{}, err
+	}
+
+	currentPageInt, err := strconv.Atoi(currentPage)
+	if err != nil {
+		return tgbotapi.InlineKeyboardMarkup{}, err
+	}
+
+	paginationRow := createPaginationRow(categoryID, currentPageInt, totalPagesInt)
+	rows = append(rows, paginationRow)
+
+	return tgbotapi.NewInlineKeyboardMarkup(rows...), nil
+}
+
+func CreateServiceKeyboard(db *gorm.DB, subcategoryID, currentPage, totalServicePages string) (tgbotapi.InlineKeyboardMarkup, error) {
+	var rows [][]tgbotapi.InlineKeyboardButton
+
+	services, err := GetServicesBySubcategoryID(db, subcategoryID)
+	if err != nil {
+		return tgbotapi.InlineKeyboardMarkup{}, err
+	}
+
+	startIdx, endIdx := calculatePageRange(len(services), itemsPerPage, currentPage)
+
+	for i := startIdx; i < endIdx; i++ {
+		service := services[i]
+		button := tgbotapi.NewInlineKeyboardButtonData(service.Name, fmt.Sprintf("service:%s", service.ServiceID))
+		row := []tgbotapi.InlineKeyboardButton{button}
+		rows = append(rows, row)
+	}
+
+	totalServicePagesInt, err := strconv.Atoi(totalServicePages)
+	if err != nil {
+		return tgbotapi.InlineKeyboardMarkup{}, err
+	}
+
+	currentPageInt, err := strconv.Atoi(currentPage)
+	if err != nil {
+		return tgbotapi.InlineKeyboardMarkup{}, err
+	}
+
+	paginationRow := createServicePaginationRow(subcategoryID, currentPageInt, totalServicePagesInt)
+	rows = append(rows, paginationRow)
 
 	return tgbotapi.NewInlineKeyboardMarkup(rows...), nil
 }

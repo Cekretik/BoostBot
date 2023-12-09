@@ -18,10 +18,8 @@ func CheckSubscriptionStatus(bot *tgbotapi.BotAPI, db *gorm.DB, channelID int64,
 		return false, err
 	}
 
-	// Проверяем статус подписки
 	isSubscribed := chatMember.Status != "left"
 
-	// Обновляем статус подписки в базе данных
 	if err := UpdateSubscriptionStatus(db, channelID, userID, isSubscribed); err != nil {
 		log.Printf("Error updating subscription status in the database: %v", err)
 		return false, err
@@ -36,7 +34,7 @@ func UpdateSubscriptionStatus(db *gorm.DB, channelID int64, userID int64, subscr
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			// Если запись не найдена, создаем новую
+
 			userState = UserState{
 				UserID:     userID,
 				ChannelID:  channelID,
@@ -53,7 +51,6 @@ func UpdateSubscriptionStatus(db *gorm.DB, channelID int64, userID int64, subscr
 		return result.Error
 	}
 
-	// Если запись найдена, обновляем статус подписки
 	userState.Subscribed = subscribed
 	if err := db.Save(&userState).Error; err != nil {
 		log.Printf("Error updating user subscription status: %v", err)

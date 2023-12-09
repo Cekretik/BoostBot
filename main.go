@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
@@ -36,8 +37,33 @@ func main() {
 
 	for update := range updates {
 		if update.CallbackQuery != nil {
-			totalPages, _ := GetTotalPagesForSubcategory(db, itemsPerPage, update.CallbackQuery.Data)
-			HandleCallbackQuery(bot, db, update.CallbackQuery, totalPages)
+			callbackData := update.CallbackQuery.Data
+			if strings.HasPrefix(callbackData, "subcategory:") || strings.HasPrefix(callbackData, "prevServ:") || strings.HasPrefix(callbackData, "nextServ:") {
+
+				var subcategoryID string
+				if strings.HasPrefix(callbackData, "subcategory:") {
+					subcategoryID = strings.TrimPrefix(callbackData, "subcategory:")
+				} else {
+					parts := strings.Split(callbackData, ":")
+					subcategoryID = parts[1]
+				}
+
+				totalServicePages, err := GetTotalPagesForService(db, itemsPerPage, subcategoryID)
+				if err != nil {
+					log.Printf("Error getting total pages for services: %v", err)
+					continue
+				}
+
+				HandleServiceCallBackQuery(bot, db, update.CallbackQuery, totalServicePages)
+			} else {
+				totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, callbackData)
+				if err != nil {
+					log.Printf("Error getting total pages for category: %v", err)
+					continue
+				}
+
+				HandleCallbackQuery(bot, db, update.CallbackQuery, totalPages)
+			}
 		} else if update.Message != nil {
 			userID := update.Message.From.ID
 			isSubscribed, err := CheckSubscriptionStatus(bot, db, channelID, int64(userID))

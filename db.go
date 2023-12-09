@@ -226,7 +226,7 @@ func GetSubcategoriesByCategoryID(db *gorm.DB, categoryID string) ([]Subcategory
 // Get services by subcategory ID
 func GetServicesBySubcategoryID(db *gorm.DB, subcategoryID string) ([]Service, error) {
 	var services []Service
-	if err := db.Where("subcategory_id = ?", subcategoryID).Find(&services).Error; err != nil {
+	if err := db.Where("category_id = ?", subcategoryID).Find(&services).Error; err != nil {
 		return nil, err
 	}
 	return services, nil
@@ -280,21 +280,23 @@ func updateService(tx *gorm.DB, newService Service) error {
 		return result.Error
 	}
 
-	if existingService.Name != newService.Name ||
+	if existingService.ID != newService.ID ||
+		existingService.Name != newService.Name ||
 		existingService.CategoryID != newService.CategoryID ||
 		existingService.Min != newService.Min ||
 		existingService.Max != newService.Max ||
 		existingService.Dripfeed != newService.Dripfeed ||
 		existingService.Refill != newService.Refill ||
 		existingService.Cancel != newService.Cancel ||
+		existingService.ServiceID != newService.ServiceID ||
 		existingService.Rate != newService.Rate ||
 		existingService.Type != newService.Type ||
 		existingService.ServiceType != newService.ServiceType ||
 		existingService.AverageTimestamp != newService.AverageTimestamp ||
 		existingService.CreatedAt != newService.CreatedAt ||
 		existingService.UpdatedAt != newService.UpdatedAt {
-		return tx.Model(&existingService).Updates(Service{Name: newService.Name, CategoryID: newService.CategoryID, Min: newService.Min,
-			Max: newService.Max, Dripfeed: newService.Dripfeed, Refill: newService.Refill, Cancel: newService.Cancel, Rate: newService.Rate,
+		return tx.Model(&existingService).Updates(Service{ID: newService.ID, Name: newService.Name, CategoryID: newService.CategoryID, Min: newService.Min,
+			Max: newService.Max, Dripfeed: newService.Dripfeed, Refill: newService.Refill, Cancel: newService.Cancel, ServiceID: newService.ServiceID, Rate: newService.Rate,
 			Type: newService.Type, ServiceType: newService.ServiceType, AverageTimestamp: newService.AverageTimestamp,
 			CreatedAt: newService.CreatedAt, UpdatedAt: newService.UpdatedAt}).Error
 	}
