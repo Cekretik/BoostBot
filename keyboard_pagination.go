@@ -110,6 +110,25 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 		editMsg := tgbotapi.NewEditMessageReplyMarkup(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID, keyboard)
 		bot.Send(editMsg)
 	}
+	if strings.HasPrefix(callbackQuery.Data, "serviceInfo:") {
+		// Удаление предыдущего сообщения
+		deleteMsg := tgbotapi.NewDeleteMessage(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID)
+		bot.Send(deleteMsg)
+
+		serviceID := strings.TrimPrefix(callbackQuery.Data, "serviceInfo:")
+
+		// Получение информации о сервисе из БД
+		service, err := GetServiceByID(db, serviceID)
+		if err != nil {
+			log.Printf("Error getting service '%s': %v", serviceID, err)
+			return
+		}
+
+		// Форматирование и отправка информации о сервисе пользователю
+		msgText := FormatServiceInfo(service)
+		msg := tgbotapi.NewMessage(callbackQuery.Message.Chat.ID, msgText)
+		bot.Send(msg)
+	}
 }
 
 func GetTotalPagesForCategory(db *gorm.DB, itemsPerPage int, categoryID string) (int, error) {

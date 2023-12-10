@@ -172,7 +172,8 @@ func CreateServiceKeyboard(db *gorm.DB, subcategoryID, currentPage, totalService
 
 	for i := startIdx; i < endIdx; i++ {
 		service := services[i]
-		button := tgbotapi.NewInlineKeyboardButtonData(service.Name, fmt.Sprintf("service:%s", service.ServiceID))
+		// Создаем кнопку для каждого сервиса
+		button := tgbotapi.NewInlineKeyboardButtonData(service.Name, fmt.Sprintf("serviceInfo:%s", service.ServiceID))
 		row := []tgbotapi.InlineKeyboardButton{button}
 		rows = append(rows, row)
 	}
@@ -187,8 +188,20 @@ func CreateServiceKeyboard(db *gorm.DB, subcategoryID, currentPage, totalService
 		return tgbotapi.InlineKeyboardMarkup{}, err
 	}
 
+	// Добавляем кнопки пагинации
 	paginationRow := createServicePaginationRow(subcategoryID, currentPageInt, totalServicePagesInt)
 	rows = append(rows, paginationRow)
 
 	return tgbotapi.NewInlineKeyboardMarkup(rows...), nil
+}
+
+func FormatServiceInfo(service Service) string {
+	return fmt.Sprintf(
+		"ℹ️ Информация об услуге\n\n"+
+			"🔢 ID услуги: %s\n"+
+			"📝 Название: %s\n\n"+
+			"💸 Цена: $%.2f\n\n"+
+			"📉 Минимальное количество: %d\n"+
+			"📈 Максимальное количество: %d",
+		service.ServiceID, service.Name, service.Rate, service.Min, service.Max)
 }

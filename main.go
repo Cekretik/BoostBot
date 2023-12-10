@@ -39,7 +39,6 @@ func main() {
 		if update.CallbackQuery != nil {
 			callbackData := update.CallbackQuery.Data
 			if strings.HasPrefix(callbackData, "subcategory:") || strings.HasPrefix(callbackData, "prevServ:") || strings.HasPrefix(callbackData, "nextServ:") {
-
 				var subcategoryID string
 				if strings.HasPrefix(callbackData, "subcategory:") {
 					subcategoryID = strings.TrimPrefix(callbackData, "subcategory:")
@@ -55,6 +54,8 @@ func main() {
 				}
 
 				HandleServiceCallBackQuery(bot, db, update.CallbackQuery, totalServicePages)
+			} else if strings.HasPrefix(callbackData, "serviceInfo:") {
+				HandleServiceCallBackQuery(bot, db, update.CallbackQuery, 0)
 			} else {
 				totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, callbackData)
 				if err != nil {
