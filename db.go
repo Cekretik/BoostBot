@@ -239,6 +239,13 @@ func GetServiceByID(db *gorm.DB, serviceID string) (Service, error) {
 	return service, result.Error
 }
 
+// Get subcategory by subcategory ID
+func GetSubcategoryByID(db *gorm.DB, subcategoryID string) (Subcategory, error) {
+	var subcategory Subcategory
+	result := db.First(&subcategory, "subcategory_id = ?", subcategoryID)
+	return subcategory, result.Error
+}
+
 // Updating category, subcategory and service
 func updateCategory(tx *gorm.DB, newCategory Category) error {
 	var existingCategory Category

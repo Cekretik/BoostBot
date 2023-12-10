@@ -13,47 +13,45 @@ import (
 var itemsPerPage = 10
 
 func HandleCallbackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery *tgbotapi.CallbackQuery, totalPages int) {
-	if strings.HasPrefix(callbackQuery.Data, "category:") {
-		categoryID := strings.TrimPrefix(callbackQuery.Data, "category:")
+	parts := strings.Split(callbackQuery.Data, ":")
+	action := parts[0]
 
+	if action == "category" {
+		categoryID := parts[1]
 		totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, categoryID)
 		if err != nil {
 			log.Println("Error calculating total pages:", err)
 			return
 		}
+
 		keyboard, err := CreateSubcategoryKeyboard(db, categoryID, "1", strconv.Itoa(totalPages))
 		if err != nil {
-			log.Println("Error creating promotion keyboard:", err)
+			log.Println("Error creating subcategory keyboard:", err)
 			return
 		}
-		editMsg := tgbotapi.NewEditMessageReplyMarkup(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID, keyboard)
-		bot.Send(editMsg)
 
-	} else if strings.HasPrefix(callbackQuery.Data, "prevCat:") || strings.HasPrefix(callbackQuery.Data, "nextCat:") {
-		parts := strings.Split(callbackQuery.Data, ":")
-		categoryID, currentPage := parts[1], parts[2]
-		if strings.HasPrefix(callbackQuery.Data, "prevCat:") {
+		deleteMsg := tgbotapi.NewDeleteMessage(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID)
+		bot.Send(deleteMsg)
 
-			prevPage, _ := strconv.Atoi(currentPage)
-			if prevPage > 1 {
-				prevPage--
-			}
-			currentPage = strconv.Itoa(prevPage)
-		} else {
+		msg := tgbotapi.NewMessage(callbackQuery.Message.Chat.ID, "Выберите категорию:")
+		msg.ReplyMarkup = keyboard
+		bot.Send(msg)
 
-			nextPage, _ := strconv.Atoi(currentPage)
-			nextPage++
-			currentPage = strconv.Itoa(nextPage)
+	} else if action == "prevCat" || action == "nextCat" {
+		currentPage, _ := strconv.Atoi(parts[2])
+		if action == "prevCat" && currentPage > 1 {
+			currentPage--
+		} else if action == "nextCat" && currentPage < totalPages {
+			currentPage++
 		}
-
-		totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, categoryID)
+		totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, parts[1])
 		if err != nil {
-			log.Println("Error calculating total pages:", err)
+			log.Println("Error recalculating total pages:", err)
 			return
 		}
-		keyboard, err := CreateSubcategoryKeyboard(db, categoryID, currentPage, strconv.Itoa(totalPages))
+		keyboard, err := CreateSubcategoryKeyboard(db, parts[1], strconv.Itoa(currentPage), strconv.Itoa(totalPages))
 		if err != nil {
-			log.Println("Error creating promotion keyboard:", err)
+			log.Println("Error updating subcategory keyboard:", err)
 			return
 		}
 		editMsg := tgbotapi.NewEditMessageReplyMarkup(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID, keyboard)
@@ -77,8 +75,12 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 			return
 		}
 
-		editMsg := tgbotapi.NewEditMessageReplyMarkup(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID, keyboard)
-		bot.Send(editMsg)
+		deleteMsg := tgbotapi.NewDeleteMessage(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID)
+		bot.Send(deleteMsg)
+
+		msg := tgbotapi.NewMessage(callbackQuery.Message.Chat.ID, "Выберите услугу:")
+		msg.ReplyMarkup = keyboard
+		bot.Send(msg)
 
 	} else if strings.HasPrefix(callbackQuery.Data, "prevServ:") || strings.HasPrefix(callbackQuery.Data, "nextServ:") {
 		parts := strings.Split(callbackQuery.Data, ":")
@@ -91,7 +93,7 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 
 		if action == "prevServ" && currentPage > 1 {
 			currentPage--
-		} else if action == "nextServ" {
+		} else if action == "nextServ" && currentPage < totalServicePages {
 			currentPage++
 		}
 
@@ -109,28 +111,88 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 
 		editMsg := tgbotapi.NewEditMessageReplyMarkup(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID, keyboard)
 		bot.Send(editMsg)
-	}
-	if strings.HasPrefix(callbackQuery.Data, "serviceInfo:") {
-		// Удаление предыдущего сообщения
+
+	} else if strings.HasPrefix(callbackQuery.Data, "serviceInfo:") {
+		serviceID := strings.TrimPrefix(callbackQuery.Data, "serviceInfo:")
 		deleteMsg := tgbotapi.NewDeleteMessage(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID)
 		bot.Send(deleteMsg)
 
-		serviceID := strings.TrimPrefix(callbackQuery.Data, "serviceInfo:")
-
-		// Получение информации о сервисе из БД
 		service, err := GetServiceByID(db, serviceID)
 		if err != nil {
 			log.Printf("Error getting service '%s': %v", serviceID, err)
 			return
 		}
+		subcategory, err := GetSubcategoryByID(db, service.CategoryID)
+		if err != nil {
+			log.Printf("Error getting subcategory '%s': %v", subcategory.Name, err)
+			return
+		}
 
-		// Форматирование и отправка информации о сервисе пользователю
-		msgText := FormatServiceInfo(service)
+		msgText := FormatServiceInfo(service, subcategory)
 		msg := tgbotapi.NewMessage(callbackQuery.Message.Chat.ID, msgText)
+
+		backData := "backToServices:" + service.CategoryID
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("🔙Вернуться к услугам", backData),
+			),
+		)
+		msg.ReplyMarkup = keyboard
+
+		bot.Send(msg)
+
+	} else if strings.HasPrefix(callbackQuery.Data, "backToServices:") {
+		subcategoryID := strings.TrimPrefix(callbackQuery.Data, "backToServices:")
+		deleteMsg := tgbotapi.NewDeleteMessage(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID)
+		bot.Send(deleteMsg)
+
+		totalServicePages, err := GetTotalPagesForService(db, itemsPerPage, subcategoryID)
+		if err != nil {
+			log.Printf("Error getting total pages for services: %v", err)
+			return
+		}
+
+		keyboard, err := CreateServiceKeyboard(db, subcategoryID, "1", strconv.Itoa(totalServicePages))
+		if err != nil {
+			log.Printf("Error creating service keyboard for subcategory '%s': %v", subcategoryID, err)
+			return
+		}
+
+		msg := tgbotapi.NewMessage(callbackQuery.Message.Chat.ID, "Выберите услугу:")
+		msg.ReplyMarkup = keyboard
+		bot.Send(msg)
+	} else if strings.HasPrefix(callbackQuery.Data, "backToSubcategories:") {
+		// Получение ID подкатегории из данных callback
+		subcategoryID := strings.TrimPrefix(callbackQuery.Data, "backToSubcategories:")
+
+		// Получение объекта подкатегории по ID
+		subcategory, err := GetSubcategoryByID(db, subcategoryID)
+		if err != nil {
+			log.Printf("Error getting subcategory '%s': %v", subcategoryID, err)
+			return
+		}
+
+		deleteMsg := tgbotapi.NewDeleteMessage(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID)
+		bot.Send(deleteMsg)
+
+		// Получение списка подкатегорий для категории, к которой принадлежит текущая подкатегория
+		totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, subcategory.CategoryID)
+		if err != nil {
+			log.Printf("Error calculating total pages for category '%s': %v", subcategory.CategoryID, err)
+			return
+		}
+
+		keyboard, err := CreateSubcategoryKeyboard(db, subcategory.CategoryID, "1", strconv.Itoa(totalPages))
+		if err != nil {
+			log.Printf("Error creating subcategory keyboard for category '%s': %v", subcategory.CategoryID, err)
+			return
+		}
+
+		msg := tgbotapi.NewMessage(callbackQuery.Message.Chat.ID, "Выберите категорию:")
+		msg.ReplyMarkup = keyboard
 		bot.Send(msg)
 	}
 }
-
 func GetTotalPagesForCategory(db *gorm.DB, itemsPerPage int, categoryID string) (int, error) {
 	var totalSubcategories int64
 	if err := db.Model(&Subcategory{}).Where("category_id = ?", categoryID).Count(&totalSubcategories).Error; err != nil {

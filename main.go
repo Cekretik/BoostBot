@@ -56,8 +56,33 @@ func main() {
 				HandleServiceCallBackQuery(bot, db, update.CallbackQuery, totalServicePages)
 			} else if strings.HasPrefix(callbackData, "serviceInfo:") {
 				HandleServiceCallBackQuery(bot, db, update.CallbackQuery, 0)
-			} else {
-				totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, callbackData)
+			} else if strings.HasPrefix(callbackData, "backToServices:") {
+				subcategoryID := strings.TrimPrefix(callbackData, "backToServices:")
+				totalServicePages, err := GetTotalPagesForService(db, itemsPerPage, subcategoryID)
+				if err != nil {
+					log.Printf("Error getting total pages for services: %v", err)
+					continue
+				}
+
+				HandleServiceCallBackQuery(bot, db, update.CallbackQuery, totalServicePages)
+			} else if strings.HasPrefix(callbackData, "backToSubcategories:") {
+				categoryID := strings.TrimPrefix(callbackData, "backToSubcategories:")
+				totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, categoryID)
+				if err != nil {
+					log.Printf("Error getting total pages for category: %v", err)
+					continue
+				}
+				HandleServiceCallBackQuery(bot, db, update.CallbackQuery, totalPages)
+			} else if strings.HasPrefix(callbackData, "category:") || strings.HasPrefix(callbackData, "prevCat:") || strings.HasPrefix(callbackData, "nextCat:") || strings.HasPrefix(callbackData, "backToCategories:") {
+				var categoryID string
+				if strings.HasPrefix(callbackData, "category:") {
+					categoryID = strings.TrimPrefix(callbackData, "category:")
+				} else {
+					parts := strings.Split(callbackData, ":")
+					categoryID = parts[1]
+				}
+
+				totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, categoryID)
 				if err != nil {
 					log.Printf("Error getting total pages for category: %v", err)
 					continue
