@@ -41,6 +41,7 @@ func GetUserState(db *gorm.DB, userID, channelID int64, subscribed bool) (*UserS
 				UserID:     userID,
 				ChannelID:  channelID,
 				Subscribed: subscribed,
+				Balance:    0,
 			}
 			if err := db.Create(&userState).Error; err != nil {
 				log.Printf("Error creating new user state: %v", err)

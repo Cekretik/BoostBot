@@ -14,6 +14,12 @@ var currentPage = ""
 func WelcomeMessage(bot *tgbotapi.BotAPI, chatID int64) {
 	messageText := "Добро пожаловать!"
 	msg := tgbotapi.NewMessage(chatID, messageText)
+	balanceButton := tgbotapi.NewKeyboardButton("💰Баланс")
+	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(balanceButton),
+	)
+
+	msg.ReplyMarkup = quickReplyMarkup
 	bot.Send(msg)
 }
 
@@ -187,7 +193,7 @@ func CreateServiceKeyboard(db *gorm.DB, subcategoryID, currentPage, totalService
 	if err != nil {
 		return tgbotapi.InlineKeyboardMarkup{}, err
 	}
-	backToSubcategoriesButton := tgbotapi.NewInlineKeyboardButtonData("🔙 Вернуться к подкатегориям", fmt.Sprintf("backToSubcategories:%s", subcategoryID))
+	backToSubcategoriesButton := tgbotapi.NewInlineKeyboardButtonData("🔙 Вернуться к категориям", fmt.Sprintf("backToSubcategories:%s", subcategoryID))
 	rows = append(rows, []tgbotapi.InlineKeyboardButton{backToSubcategoriesButton})
 	paginationRow := createServicePaginationRow(subcategoryID, currentPageInt, totalServicePagesInt)
 	rows = append(rows, paginationRow)
@@ -205,4 +211,25 @@ func FormatServiceInfo(service Service, subcategory Subcategory) string {
 			"📉 Минимальное количество: %d\n"+
 			"📈 Максимальное количество: %d",
 		service.ServiceID, service.Name, subcategory.Name, service.Rate, service.Min, service.Max)
+}
+
+// Функция для обработки нажатия кнопки "Баланс"
+func handleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
+	var userState UserState
+	if err := db.Where("user_id = ?", userID).First(&userState).Error; err != nil {
+		log.Printf("Error fetching user state: %v", err)
+		return
+	}
+
+	balanceMsgText := fmt.Sprintf("🆔 Ваш ID: %d\n💵 Ваш баланс: $%.2f", userState.UserID, userState.Balance)
+	msg := tgbotapi.NewMessage(userID, balanceMsgText)
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("💰Пополнить баланс", "replenishBalance"),
+		),
+	)
+	msg.ReplyMarkup = keyboard
+
+	bot.Send(msg)
 }

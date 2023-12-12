@@ -8,9 +8,10 @@ import (
 
 type UserState struct {
 	gorm.Model
-	UserID     int64 `gorm:"column:user_id" json:"user_id"`
-	Subscribed bool  `gorm:"column:subscribed" json:"subscribed"`
-	ChannelID  int64 `gorm:"column:channel_id" json:"channel_id"`
+	UserID     int64   `gorm:"column:user_id" json:"user_id"`
+	Subscribed bool    `gorm:"column:subscribed" json:"subscribed"`
+	ChannelID  int64   `gorm:"column:channel_id" json:"channel_id"`
+	Balance    float64 `gorm:"column:balance" json:"balance"`
 }
 
 type Category struct {
