@@ -31,7 +31,7 @@ func InitDB() (*gorm.DB, error) {
 }
 
 // Get user state
-func GetUserState(db *gorm.DB, userID, channelID int64, subscribed bool) (*UserState, error) {
+func GetUserState(db *gorm.DB, userID, channelID int64, subscribed bool, balance float64, userName string) (*UserState, error) {
 	var userState UserState
 	result := db.Where("user_id = ? AND channel_id = ?", userID, channelID).First(&userState)
 
@@ -39,9 +39,10 @@ func GetUserState(db *gorm.DB, userID, channelID int64, subscribed bool) (*UserS
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			userState = UserState{
 				UserID:     userID,
+				UserName:   userName,
 				ChannelID:  channelID,
 				Subscribed: subscribed,
-				Balance:    0,
+				Balance:    balance,
 			}
 			if err := db.Create(&userState).Error; err != nil {
 				log.Printf("Error creating new user state: %v", err)
@@ -58,14 +59,17 @@ func GetUserState(db *gorm.DB, userID, channelID int64, subscribed bool) (*UserS
 }
 
 // Update user subscription status
-func UpdateUserSubscriptionStatus(db *gorm.DB, userID, channelID int64, subscribed bool) error {
-	userState, err := GetUserState(db, userID, channelID, true)
+func UpdateUserState(db *gorm.DB, userID, channelID int64, subscribed bool, balance float64, userName string) error {
+	userState, err := GetUserState(db, userID, channelID, true, balance, userName)
 	if err != nil {
 		return err
 	}
 
-	if userState.Subscribed != subscribed {
+	if userState.Subscribed != subscribed || userState.UserName != userName || userState.Balance != balance {
+		userState.Balance = balance
 		userState.Subscribed = subscribed
+		userState.UserName = userName
+		userState.Balance = balance
 		if err := db.Save(userState).Error; err != nil {
 			log.Printf("Error updating user subscription status: %v", err)
 			return err

@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func CheckSubscriptionStatus(bot *tgbotapi.BotAPI, db *gorm.DB, channelID int64, userID int64) (bool, error) {
+func CheckSubscriptionStatus(bot *tgbotapi.BotAPI, db *gorm.DB, channelID int64, userID int64, balance float64, userName string) (bool, error) {
 	chatMember, err := bot.GetChatMember(tgbotapi.ChatConfigWithUser{
 		ChatID: channelID,
 		UserID: int(userID),
@@ -20,7 +20,7 @@ func CheckSubscriptionStatus(bot *tgbotapi.BotAPI, db *gorm.DB, channelID int64,
 
 	isSubscribed := chatMember.Status != "left"
 
-	if err := UpdateSubscriptionStatus(db, channelID, userID, isSubscribed); err != nil {
+	if err := UpdateUserStatus(db, channelID, userID, isSubscribed, balance, userName); err != nil {
 		log.Printf("Error updating subscription status in the database: %v", err)
 		return false, err
 	}
@@ -28,7 +28,7 @@ func CheckSubscriptionStatus(bot *tgbotapi.BotAPI, db *gorm.DB, channelID int64,
 	return isSubscribed, nil
 }
 
-func UpdateSubscriptionStatus(db *gorm.DB, channelID int64, userID int64, subscribed bool) error {
+func UpdateUserStatus(db *gorm.DB, channelID int64, userID int64, subscribed bool, balance float64, userName string) error {
 	var userState UserState
 	result := db.Where("user_id = ? AND channel_id = ?", userID, channelID).First(&userState)
 
@@ -37,8 +37,10 @@ func UpdateSubscriptionStatus(db *gorm.DB, channelID int64, userID int64, subscr
 
 			userState = UserState{
 				UserID:     userID,
+				UserName:   userName,
 				ChannelID:  channelID,
 				Subscribed: subscribed,
+				Balance:    balance,
 			}
 			if err := db.Create(&userState).Error; err != nil {
 				log.Printf("Error creating new user state: %v", err)
@@ -52,6 +54,7 @@ func UpdateSubscriptionStatus(db *gorm.DB, channelID int64, userID int64, subscr
 	}
 
 	userState.Subscribed = subscribed
+	userState.UserName = userName
 	if err := db.Save(&userState).Error; err != nil {
 		log.Printf("Error updating user subscription status: %v", err)
 		return err

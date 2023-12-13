@@ -92,7 +92,9 @@ func main() {
 			}
 		} else if update.Message != nil {
 			userID := update.Message.From.ID
-			isSubscribed, err := CheckSubscriptionStatus(bot, db, channelID, int64(userID))
+			userName := update.Message.From.UserName
+			balance := 0.0
+			isSubscribed, err := CheckSubscriptionStatus(bot, db, channelID, int64(userID), balance, userName)
 			if err != nil {
 				log.Printf("Error checking subscription status: %v", err)
 				continue
