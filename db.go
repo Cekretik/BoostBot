@@ -22,7 +22,7 @@ func InitDB() (*gorm.DB, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&UserState{}, &Category{}, &Subcategory{}, &Service{})
+	err = db.AutoMigrate(&UserState{}, &Category{}, &Subcategory{}, &Service{}, &OrdersContractsEntity{})
 	if err != nil {
 		return nil, err
 	}

@@ -136,11 +136,23 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData("🔙Вернуться к услугам", backData),
 			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("➕Заказать", "order"),
+			),
 		)
 		msg.ReplyMarkup = keyboard
 
 		bot.Send(msg)
 
+	} else if strings.HasPrefix(callbackQuery.Data, "order:") {
+		serviceID := strings.TrimPrefix(callbackQuery.Data, "order:")
+		service, err := GetServiceByID(db, serviceID)
+		if err != nil {
+			log.Printf("Error getting service '%s': %v", serviceID, err)
+			bot.Send(tgbotapi.NewMessage(callbackQuery.Message.Chat.ID, "Ошибка при получении данных сервиса."))
+			return
+		}
+		handleOrderCommand(bot, callbackQuery.Message.Chat.ID, service)
 	} else if strings.HasPrefix(callbackQuery.Data, "backToServices:") {
 		subcategoryID := strings.TrimPrefix(callbackQuery.Data, "backToServices:")
 		deleteMsg := tgbotapi.NewDeleteMessage(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID)
