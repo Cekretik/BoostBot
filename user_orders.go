@@ -16,8 +16,9 @@ type UserStatus struct {
 	Quantity         int
 }
 
+var userStatuses map[int64]*UserStatus = make(map[int64]*UserStatus)
+
 func getUserStatus(chatID int64) *UserStatus {
-	var userStatuses map[int64]*UserStatus = make(map[int64]*UserStatus)
 	if status, exists := userStatuses[chatID]; exists {
 		return status
 	}
@@ -30,13 +31,18 @@ func handleOrderCommand(bot *tgbotapi.BotAPI, chatID int64, service Service) {
 	userStatus.CurrentState = "awaitingLink"
 	userStatus.PendingServiceID = service.ServiceID
 
-	msgText := fmt.Sprintf("💬 Вы заказываете услугу: %s.\n\nДля оформления заказа укажите ссылку.", service.Name)
+	msgText := fmt.Sprintf("💬 Вы заказываете услугу: %s.\n\n Айди усулги %s. \n\nДля оформления заказа укажите ссылку.", service.Name, service.ServiceID)
+	cancelKeyboard := tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("Отмена"),
+		),
+	)
 	msg := tgbotapi.NewMessage(chatID, msgText)
+	msg.ReplyMarkup = cancelKeyboard
 	bot.Send(msg)
 }
 
-func handleUserInput(bot *tgbotapi.BotAPI, update tgbotapi.Update, service Service) {
-	var db gorm.DB
+func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, service Service) {
 	chatID := update.Message.Chat.ID
 	userStatus := getUserStatus(chatID)
 
@@ -74,7 +80,13 @@ func handleUserInput(bot *tgbotapi.BotAPI, update tgbotapi.Update, service Servi
 					tgbotapi.NewInlineKeyboardButtonData("💰Купить", "buy"),
 				),
 			)
-			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Цена услуги: %.2f. Ваш баланс: %.2f.", cost, user.Balance))
+			cancelKeyboard := tgbotapi.NewReplyKeyboard(
+				tgbotapi.NewKeyboardButtonRow(
+					tgbotapi.NewKeyboardButton("Отмена"),
+				),
+			)
+			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Цена услуги: $%.5f. Ваш баланс: $%.5f.", cost, user.Balance))
+			msg.ReplyMarkup = cancelKeyboard
 			msg.ReplyMarkup = keyboard
 			bot.Send(msg)
 		} else {
@@ -83,7 +95,13 @@ func handleUserInput(bot *tgbotapi.BotAPI, update tgbotapi.Update, service Servi
 					tgbotapi.NewInlineKeyboardButtonData("💳 Пополнить баланс", "replenish"),
 				),
 			)
-			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("На вашем балансе недостаточно средств. Цена услуги: %.2f. Ваш баланс: %.2f.", cost, user.Balance))
+			cancelKeyboard := tgbotapi.NewReplyKeyboard(
+				tgbotapi.NewKeyboardButtonRow(
+					tgbotapi.NewKeyboardButton("Отмена"),
+				),
+			)
+			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("На вашем балансе недостаточно средств. Цена услуги: $%.5f. Ваш баланс: $%.5f.", cost, user.Balance))
+			msg.ReplyMarkup = cancelKeyboard
 			msg.ReplyMarkup = keyboard
 			bot.Send(msg)
 		}
@@ -92,7 +110,6 @@ func handleUserInput(bot *tgbotapi.BotAPI, update tgbotapi.Update, service Servi
 
 func handlePurchase(bot *tgbotapi.BotAPI, chatID int64, service Service) {
 
-	var userStatuses map[int64]*UserStatus = make(map[int64]*UserStatus)
 	userStatus, exists := userStatuses[chatID]
 	if !exists {
 		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при оформлении заказа. Пожалуйста, попробуйте снова."))

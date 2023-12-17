@@ -89,24 +89,82 @@ func main() {
 				}
 
 				HandleCallbackQuery(bot, db, update.CallbackQuery, totalPages)
-			}
-		} else if update.Message != nil {
-			userID := update.Message.From.ID
-			userName := update.Message.From.UserName
-			balance := 0.0
-			isSubscribed, err := CheckSubscriptionStatus(bot, db, channelID, int64(userID), balance, userName)
-			if err != nil {
-				log.Printf("Error checking subscription status: %v", err)
-				continue
+			} else if strings.HasPrefix(callbackData, "order:") {
+				serviceID := strings.TrimPrefix(callbackData, "order:")
+				if serviceID == "" {
+					log.Printf("Service ID is empty in callback data: %s", callbackData)
+					bot.Send(tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Ошибка: ID сервиса не указан."))
+					continue
+				}
+				service, err := GetServiceByID(db, serviceID)
+				if err != nil {
+					log.Printf("Error getting service '%s': %v", serviceID, err)
+					bot.Send(tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Ошибка при получении данных сервиса."))
+					continue
+				}
+				handleOrderCommand(bot, update.CallbackQuery.Message.Chat.ID, service)
 			}
 
-			if update.Message.Text == "💰Баланс" {
-				handleBalanceCommand(bot, update.Message.Chat.ID, db)
-			} else if isSubscribed {
-				WelcomeMessage(bot, update.Message.Chat.ID)
-				SendPromotionMessage(bot, update.Message.Chat.ID, db)
+			// Обработка кнопки "Купить"
+			if strings.HasPrefix(callbackData, "buy") {
+				chatID := update.CallbackQuery.Message.Chat.ID
+				if userStatus, exists := userStatuses[chatID]; exists {
+					service, err := GetServiceByID(db, userStatus.PendingServiceID)
+					if err != nil {
+						log.Printf("Error getting service '%s': %v", userStatus.PendingServiceID, err)
+						bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении данных сервиса."))
+						continue
+					}
+					handlePurchase(bot, chatID, service)
+				} else {
+					bot.Send(tgbotapi.NewMessage(chatID, "Ваш запрос не может быть обработан. Пожалуйста, начните процесс заново."))
+				}
+			}
+		}
+
+		// Обработка обычных сообщений
+		if update.Message != nil {
+			chatID := update.Message.Chat.ID
+
+			// Обработка команды "Отмена"
+			if update.Message.Text == "Отмена" {
+				if _, exists := userStatuses[chatID]; exists {
+					delete(userStatuses, chatID)
+					bot.Send(tgbotapi.NewMessage(chatID, "Отменено"))
+					continue // Прерываем обработку и переходим к следующему обновлению
+				}
+			}
+
+			// Проверяем, находится ли пользователь в процессе заказа
+			if userStatus, exists := userStatuses[chatID]; exists && userStatus.CurrentState != "" {
+				service, err := GetServiceByID(db, userStatus.PendingServiceID)
+				if err != nil {
+					log.Printf("Error getting service '%s': %v", userStatus.PendingServiceID, err)
+					bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении данных сервиса."))
+					continue
+				}
+				handleUserInput(db, bot, update, service)
 			} else {
-				SendSubscriptionMessage(bot, update.Message.Chat.ID)
+				// Обработка других команд и сообщений
+				userID := update.Message.From.ID
+				userName := update.Message.From.UserName
+				balance := 0.0 // Получение баланса пользователя
+
+				// Проверка статуса подписки и другие команды
+				isSubscribed, err := CheckSubscriptionStatus(bot, db, channelID, int64(userID), balance, userName)
+				if err != nil {
+					log.Printf("Error checking subscription status: %v", err)
+					continue
+				}
+
+				if update.Message.Text == "💰Баланс" {
+					handleBalanceCommand(bot, update.Message.Chat.ID, db)
+				} else if isSubscribed {
+					WelcomeMessage(bot, update.Message.Chat.ID)
+					SendPromotionMessage(bot, update.Message.Chat.ID, db)
+				} else {
+					SendSubscriptionMessage(bot, update.Message.Chat.ID)
+				}
 			}
 		}
 	}

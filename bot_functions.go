@@ -15,8 +15,12 @@ func WelcomeMessage(bot *tgbotapi.BotAPI, chatID int64) {
 	messageText := "Добро пожаловать!"
 	msg := tgbotapi.NewMessage(chatID, messageText)
 	balanceButton := tgbotapi.NewKeyboardButton("💰Баланс")
+	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
+	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
 	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(balanceButton),
+		tgbotapi.NewKeyboardButtonRow(ordersButton),
+		tgbotapi.NewKeyboardButtonRow(makeOrderButton),
 	)
 
 	msg.ReplyMarkup = quickReplyMarkup
@@ -207,7 +211,7 @@ func FormatServiceInfo(service Service, subcategory Subcategory) string {
 			"🔢 ID услуги: %s\n"+
 			"📝 Услга: %s\n\n"+
 			"📝Категория:%s\n\n"+
-			"💸 Цена за 1000: $%.2f\n\n"+
+			"💸 Цена за 1000: $%.5f\n\n"+
 			"📉 Минимальное количество: %d\n"+
 			"📈 Максимальное количество: %d",
 		service.ServiceID, service.Name, subcategory.Name, service.Rate, service.Min, service.Max)

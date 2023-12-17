@@ -322,3 +322,9 @@ func updateService(tx *gorm.DB, newService Service) error {
 
 	return nil
 }
+
+// func GetUsersOrders(db *gorm.DB) {
+// 	var orders []OrdersContractsEntity
+// 	userOrders,err:=fetchOrders()
+// 	if
+// }
