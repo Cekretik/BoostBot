@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"strconv"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
@@ -96,7 +97,13 @@ func main() {
 					bot.Send(tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Ошибка: ID сервиса не указан."))
 					continue
 				}
-				service, err := GetServiceByID(db, serviceID)
+				serviceIDInt, err := strconv.Atoi(serviceID)
+				if err != nil {
+					log.Printf("Error converting service ID to integer: %v", err)
+					bot.Send(tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Ошибка: ID сервиса не указан."))
+					continue
+				}
+				service, err := GetService(db, serviceIDInt)
 				if err != nil {
 					log.Printf("Error getting service '%s': %v", serviceID, err)
 					bot.Send(tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Ошибка при получении данных сервиса."))
@@ -109,7 +116,13 @@ func main() {
 			if strings.HasPrefix(callbackData, "buy") {
 				chatID := update.CallbackQuery.Message.Chat.ID
 				if userStatus, exists := userStatuses[chatID]; exists {
-					service, err := GetServiceByID(db, userStatus.PendingServiceID)
+					serviceID, err := strconv.Atoi(userStatus.PendingServiceID)
+					if err != nil {
+						log.Printf("Error converting service ID to integer: %v", err)
+						bot.Send(tgbotapi.NewMessage(chatID, "Ошибка: ID сервиса не указан."))
+						continue
+					}
+					service, err := GetService(db, serviceID)
 					if err != nil {
 						log.Printf("Error getting service '%s': %v", userStatus.PendingServiceID, err)
 						bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении данных сервиса."))
@@ -137,7 +150,13 @@ func main() {
 
 			// Проверяем, находится ли пользователь в процессе заказа
 			if userStatus, exists := userStatuses[chatID]; exists && userStatus.CurrentState != "" {
-				service, err := GetServiceByID(db, userStatus.PendingServiceID)
+				serviceID, err := strconv.Atoi(userStatus.PendingServiceID)
+				if err != nil {
+					log.Printf("Error converting service ID to integer: %v", err)
+					bot.Send(tgbotapi.NewMessage(chatID, "Ошибка: ID сервиса не указан."))
+					continue
+				}
+				service, err := GetService(db, serviceID)
 				if err != nil {
 					log.Printf("Error getting service '%s': %v", userStatus.PendingServiceID, err)
 					bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении данных сервиса."))

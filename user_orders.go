@@ -29,9 +29,9 @@ func getUserStatus(chatID int64) *UserStatus {
 func handleOrderCommand(bot *tgbotapi.BotAPI, chatID int64, service Service) {
 	userStatus := getUserStatus(chatID)
 	userStatus.CurrentState = "awaitingLink"
-	userStatus.PendingServiceID = service.ServiceID
+	userStatus.PendingServiceID = strconv.Itoa(service.ID)
 
-	msgText := fmt.Sprintf("💬 Вы заказываете услугу: %s.\n\n Айди усулги %s. \n\nДля оформления заказа укажите ссылку.", service.Name, service.ServiceID)
+	msgText := fmt.Sprintf("💬 Вы заказываете услугу: %s.\n\n Айди усулги %d. \n\nДля оформления заказа укажите ссылку.", service.Name, service.ID)
 	cancelKeyboard := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton("Отмена"),
@@ -115,7 +115,7 @@ func handlePurchase(bot *tgbotapi.BotAPI, chatID int64, service Service) {
 		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при оформлении заказа. Пожалуйста, попробуйте снова."))
 		return
 	}
-	userStatus.PendingServiceID = service.ServiceID
+	userStatus.PendingServiceID = strconv.Itoa(service.ID)
 
 	order := Order{
 		ServiceID: userStatus.PendingServiceID,

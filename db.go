@@ -288,6 +288,12 @@ func updateSubcategory(tx *gorm.DB, newSubcategory Subcategory) error {
 	return nil
 }
 
+func GetService(db *gorm.DB, id int) (Service, error) {
+	var service Service
+	result := db.First(&service, "id = ?", id)
+	return service, result.Error
+}
+
 func updateService(tx *gorm.DB, newService Service) error {
 	var existingService Service
 	result := tx.Where("service_id = ?", newService.ServiceID).First(&existingService)

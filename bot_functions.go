@@ -208,13 +208,13 @@ func CreateServiceKeyboard(db *gorm.DB, subcategoryID, currentPage, totalService
 func FormatServiceInfo(service Service, subcategory Subcategory) string {
 	return fmt.Sprintf(
 		"ℹ️ Информация об услуге\n\n"+
-			"🔢 ID услуги: %s\n"+
+			"🔢 ID услуги: %d\n"+
 			"📝 Услга: %s\n\n"+
 			"📝Категория:%s\n\n"+
 			"💸 Цена за 1000: $%.5f\n\n"+
 			"📉 Минимальное количество: %d\n"+
 			"📈 Максимальное количество: %d",
-		service.ServiceID, service.Name, subcategory.Name, service.Rate, service.Min, service.Max)
+		service.ID, service.Name, subcategory.Name, service.Rate, service.Min, service.Max)
 }
 
 // Функция для обработки нажатия кнопки "Баланс"

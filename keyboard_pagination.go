@@ -137,7 +137,7 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 				tgbotapi.NewInlineKeyboardButtonData("🔙Вернуться к услугам", backData),
 			),
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("➕Заказать", "order:"+service.ServiceID),
+				tgbotapi.NewInlineKeyboardButtonData("➕Заказать", "order:"+strconv.Itoa(service.ID)),
 			),
 		)
 		msg.ReplyMarkup = keyboard
