@@ -109,7 +109,6 @@ func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 }
 
 func handlePurchase(bot *tgbotapi.BotAPI, chatID int64, service Service) {
-	var serviceDetails ServiceDetails
 	userStatus, exists := userStatuses[chatID]
 	if !exists {
 		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при оформлении заказа. Пожалуйста, попробуйте снова."))
@@ -131,7 +130,7 @@ func handlePurchase(bot *tgbotapi.BotAPI, chatID int64, service Service) {
 	}
 
 	// Отправка подтверждения пользователю
-	bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Заказ успешно создан. ID услуги: %s \n\n ID заказа: %d", createdOrder.ServiceID, serviceDetails.ID)))
+	bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Заказ успешно создан. ID услуги: %s", createdOrder.ServiceID)))
 	delete(userStatuses, chatID)
-	sendStandardKeyboard(bot, chatID)
+	sendKeyboardAfterOrder(bot, chatID)
 }

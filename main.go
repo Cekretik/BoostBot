@@ -168,7 +168,7 @@ func main() {
 				// Обработка других команд и сообщений
 				userID := update.Message.From.ID
 				userName := update.Message.From.UserName
-				balance := 0.0 // Получение баланса пользователя
+				balance := 0.0
 
 				// Проверка статуса подписки и другие команды
 				isSubscribed, err := CheckSubscriptionStatus(bot, db, channelID, int64(userID), balance, userName)
@@ -179,6 +179,8 @@ func main() {
 
 				if update.Message.Text == "💰Баланс" {
 					handleBalanceCommand(bot, update.Message.Chat.ID, db)
+				} else if update.Message.Text == "📝Мои заказы" {
+					handleOrdersCommand(bot, update.Message.Chat.ID, db)
 				} else if isSubscribed {
 					WelcomeMessage(bot, update.Message.Chat.ID)
 					SendPromotionMessage(bot, update.Message.Chat.ID, db)

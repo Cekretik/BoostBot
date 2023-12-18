@@ -154,7 +154,6 @@ func UpdateSubcategoriesInDB(db *gorm.DB, done chan bool) {
 
 func UpdateServicesInDB(db *gorm.DB, done chan bool) {
 	for {
-		// <-done
 		var subcategories []Subcategory
 		db.Find(&subcategories)
 
@@ -351,10 +350,10 @@ func UpdateUsersOrdersInDB(db *gorm.DB, done chan bool) {
 			}
 
 			if err := tx.Commit().Error; err != nil {
-				log.Printf("Error committing transaction for categories: %v", err)
+				log.Printf("Error committing transaction for orders: %v", err)
 			} else {
-				log.Println("Categories updated in the database.")
-				done <- true
+				log.Println("Orders updated in the database.")
+
 			}
 		}
 

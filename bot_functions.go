@@ -11,6 +11,21 @@ import (
 
 var currentPage = ""
 
+func sendKeyboardAfterOrder(bot *tgbotapi.BotAPI, chatID int64) {
+	messageText := "Заказ создан, ожидайте."
+	msg := tgbotapi.NewMessage(chatID, messageText)
+	balanceButton := tgbotapi.NewKeyboardButton("💰Баланс")
+	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
+	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
+	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(balanceButton),
+		tgbotapi.NewKeyboardButtonRow(ordersButton),
+		tgbotapi.NewKeyboardButtonRow(makeOrderButton),
+	)
+
+	msg.ReplyMarkup = quickReplyMarkup
+	bot.Send(msg)
+}
 func sendStandardKeyboard(bot *tgbotapi.BotAPI, chatID int64) {
 	messageText := "Отменено"
 	msg := tgbotapi.NewMessage(chatID, messageText)
@@ -250,5 +265,30 @@ func handleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
 	)
 	msg.ReplyMarkup = keyboard
 
+	bot.Send(msg)
+}
+
+func handleOrdersCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
+	var orders []ServiceDetails
+	result := db.Where("telegram_chat_id = ?", chatID).Find(&orders)
+
+	if result.Error != nil {
+		log.Printf("Ошибка при получении заказов пользователя: %v", result.Error)
+		bot.Send(tgbotapi.NewMessage(chatID, "Произошла ошибка при получении информации о ваших заказах."))
+		return
+	}
+
+	if len(orders) == 0 {
+		bot.Send(tgbotapi.NewMessage(chatID, "Вы еще не совершали покупок."))
+		return
+	}
+
+	messageText := "📝 Ваши заказы:\n\n"
+	for _, order := range orders {
+		messageText += fmt.Sprintf("Услуга номер: %d", order.ServiceID)
+		// Дополнительная информация о заказе
+	}
+
+	msg := tgbotapi.NewMessage(chatID, messageText)
 	bot.Send(msg)
 }
