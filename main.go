@@ -177,13 +177,15 @@ func main() {
 					continue
 				}
 
-				if update.Message.Text == "💰Баланс" {
-					handleBalanceCommand(bot, update.Message.Chat.ID, db)
-				} else if update.Message.Text == "📝Мои заказы" {
-					handleOrdersCommand(bot, update.Message.Chat.ID, db)
-				} else if isSubscribed {
-					WelcomeMessage(bot, update.Message.Chat.ID)
-					SendPromotionMessage(bot, update.Message.Chat.ID, db)
+				if isSubscribed {
+					if update.Message.Text == "💰Баланс" {
+						handleBalanceCommand(bot, update.Message.Chat.ID, db)
+					} else if update.Message.Text == "📝Мои заказы" {
+						handleOrdersCommand(bot, update.Message.Chat.ID, db)
+					} else {
+						WelcomeMessage(bot, update.Message.Chat.ID)
+						SendPromotionMessage(bot, update.Message.Chat.ID, db)
+					}
 				} else {
 					SendSubscriptionMessage(bot, update.Message.Chat.ID)
 				}
