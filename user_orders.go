@@ -31,7 +31,7 @@ func handleOrderCommand(bot *tgbotapi.BotAPI, chatID int64, service Service) {
 	userStatus.CurrentState = "awaitingLink"
 	userStatus.PendingServiceID = strconv.Itoa(service.ID)
 
-	msgText := fmt.Sprintf("💬 Вы заказываете услугу: %s.\n\n Айди усулги %d. \n\nДля оформления заказа укажите ссылку.", service.Name, service.ID)
+	msgText := fmt.Sprintf("💬 Вы заказываете услугу: %s.\n\n ID усулги %d. \n\nДля оформления заказа укажите ссылку.", service.Name, service.ID)
 	cancelKeyboard := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton("Отмена"),
@@ -85,7 +85,7 @@ func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 					tgbotapi.NewKeyboardButton("Отмена"),
 				),
 			)
-			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Цена услуги: $%.5f. Ваш баланс: $%.5f.", cost, user.Balance))
+			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Цена услуги: $%g. Ваш баланс: $%g.", cost, user.Balance))
 			msg.ReplyMarkup = cancelKeyboard
 			msg.ReplyMarkup = keyboard
 			bot.Send(msg)
@@ -100,7 +100,7 @@ func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 					tgbotapi.NewKeyboardButton("Отмена"),
 				),
 			)
-			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("На вашем балансе недостаточно средств. Цена услуги: $%.5f. Ваш баланс: $%.5f.", cost, user.Balance))
+			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("На вашем балансе недостаточно средств. Цена услуги: $%g. Ваш баланс: $%g.", cost, user.Balance))
 			msg.ReplyMarkup = cancelKeyboard
 			msg.ReplyMarkup = keyboard
 			bot.Send(msg)
@@ -109,7 +109,7 @@ func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 }
 
 func handlePurchase(bot *tgbotapi.BotAPI, chatID int64, service Service) {
-
+	var serviceDetails ServiceDetails
 	userStatus, exists := userStatuses[chatID]
 	if !exists {
 		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при оформлении заказа. Пожалуйста, попробуйте снова."))
@@ -131,7 +131,7 @@ func handlePurchase(bot *tgbotapi.BotAPI, chatID int64, service Service) {
 	}
 
 	// Отправка подтверждения пользователю
-	bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Заказ успешно создан. Номер заказа: %s", createdOrder.ServiceID)))
-
+	bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Заказ успешно создан. ID услуги: %s \n\n ID заказа: %d", createdOrder.ServiceID, serviceDetails.ID)))
 	delete(userStatuses, chatID)
+	sendStandardKeyboard(bot, chatID)
 }

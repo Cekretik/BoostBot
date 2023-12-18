@@ -64,37 +64,17 @@ type Order struct {
 	Delay        int    `json:"delay"`
 }
 
-// Struct for GET orders
-type ServiceDetails struct {
-	ID               int     `json:"id"`
-	Name             string  `json:"name"`
-	ServiceID        string  `json:"serviceId"`
-	CategoryID       string  `json:"categoryId"`
-	Type             string  `json:"type"`
-	ServiceType      string  `json:"serviceType"`
-	Rate             float64 `json:"rate"`
-	Min              int     `json:"min"`
-	Max              int     `json:"max"`
-	Dripfeed         bool    `json:"dripfeed"`
-	Refill           bool    `json:"refill"`
-	Cancel           bool    `json:"cancel"`
-	AverageTimestamp string  `json:"averageTimestamp"`
-	CreatedAt        string  `json:"createdAt"`
-	UpdatedAt        string  `json:"updatedAt"`
-}
-
 // Struct of users who have orders
-type OrdersContractsEntity struct {
+type ServiceDetails struct {
 	gorm.Model
 	ID          int     `gorm:"column:id" json:"id"`
 	UserID      string  `gorm:"column:user_id" json:"userId"`
-	ServiceID   string  `gorm:"column:service_id" json:"serviceId"`
-	OrderID     int     `gorm:"column:order_id" json:"orderId"`
+	ServiceID   int     `gorm:"column:service_id" json:"serviceId"`
+	Cost        float64 `gorm:"column:cost" json:"cost"`
 	ServiceType string  `gorm:"column:service_type" json:"serviceType"`
 	Link        string  `gorm:"column:link" json:"link"`
 	Quantity    int     `gorm:"column:quantity" json:"quantity"`
 	Status      string  `gorm:"column:status" json:"status"`
-	Cost        float64 `gorm:"column:cost" json:"cost"`
 	Charge      float64 `gorm:"column:charge" json:"charge"`
 	StartCount  int     `gorm:"column:start_count" json:"startCount"`
 	Remains     int     `gorm:"column:remains" json:"remains"`

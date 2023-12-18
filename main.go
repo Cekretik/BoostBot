@@ -22,11 +22,11 @@ func main() {
 	}
 
 	doneCategories := make(chan bool)
-
+	doneOrder := make(chan bool)
 	go UpdateCategoriesInDB(db, doneCategories)
 	go UpdateSubcategoriesInDB(db, doneCategories)
 	go UpdateServicesInDB(db, doneCategories)
-
+	go UpdateUsersOrdersInDB(db, doneOrder)
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
@@ -143,8 +143,9 @@ func main() {
 			if update.Message.Text == "Отмена" {
 				if _, exists := userStatuses[chatID]; exists {
 					delete(userStatuses, chatID)
-					bot.Send(tgbotapi.NewMessage(chatID, "Отменено"))
-					continue // Прерываем обработку и переходим к следующему обновлению
+					delete(userStatuses, chatID)
+					sendStandardKeyboard(bot, chatID)
+					continue
 				}
 			}
 

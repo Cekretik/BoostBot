@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 )
 
@@ -27,8 +28,14 @@ func fetchOrders() ([]ServiceDetails, error) {
 	}
 	defer resp.Body.Close()
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
 	var serviceDetails []ServiceDetails
-	if err := json.NewDecoder(resp.Body).Decode(&serviceDetails); err != nil {
+	err = json.Unmarshal(body, &serviceDetails)
+	if err != nil {
 		return nil, err
 	}
 

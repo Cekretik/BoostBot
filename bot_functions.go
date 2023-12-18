@@ -11,6 +11,21 @@ import (
 
 var currentPage = ""
 
+func sendStandardKeyboard(bot *tgbotapi.BotAPI, chatID int64) {
+	messageText := "Отменено"
+	msg := tgbotapi.NewMessage(chatID, messageText)
+	balanceButton := tgbotapi.NewKeyboardButton("💰Баланс")
+	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
+	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
+	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(balanceButton),
+		tgbotapi.NewKeyboardButtonRow(ordersButton),
+		tgbotapi.NewKeyboardButtonRow(makeOrderButton),
+	)
+
+	msg.ReplyMarkup = quickReplyMarkup
+	bot.Send(msg)
+}
 func WelcomeMessage(bot *tgbotapi.BotAPI, chatID int64) {
 	messageText := "Добро пожаловать!"
 	msg := tgbotapi.NewMessage(chatID, messageText)
@@ -211,7 +226,7 @@ func FormatServiceInfo(service Service, subcategory Subcategory) string {
 			"🔢 ID услуги: %d\n"+
 			"📝 Услга: %s\n\n"+
 			"📝Категория:%s\n\n"+
-			"💸 Цена за 1000: $%.5f\n\n"+
+			"💸 Цена за 1000: $%g\n\n"+
 			"📉 Минимальное количество: %d\n"+
 			"📈 Максимальное количество: %d",
 		service.ID, service.Name, subcategory.Name, service.Rate, service.Min, service.Max)
@@ -225,7 +240,7 @@ func handleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
 		return
 	}
 
-	balanceMsgText := fmt.Sprintf("🆔 Ваш ID: %d\n💵 Ваш баланс: $%.2f", userState.UserID, userState.Balance)
+	balanceMsgText := fmt.Sprintf("🆔 Ваш ID: %d\n💵 Ваш баланс: $%g", userState.UserID, userState.Balance)
 	msg := tgbotapi.NewMessage(userID, balanceMsgText)
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(

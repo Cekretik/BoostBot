@@ -22,7 +22,7 @@ func InitDB() (*gorm.DB, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&UserState{}, &Category{}, &Subcategory{}, &Service{}, &OrdersContractsEntity{})
+	err = db.AutoMigrate(&UserState{}, &Category{}, &Subcategory{}, &Service{}, &ServiceDetails{})
 	if err != nil {
 		return nil, err
 	}
@@ -329,8 +329,53 @@ func updateService(tx *gorm.DB, newService Service) error {
 	return nil
 }
 
-// func GetUsersOrders(db *gorm.DB) {
-// 	var orders []OrdersContractsEntity
-// 	userOrders,err:=fetchOrders()
-// 	if
-// }
+func UpdateUsersOrdersInDB(db *gorm.DB, done chan bool) {
+	for {
+		orders, err := fetchOrders()
+		if err != nil {
+			log.Printf("Error fetching categories from API: %v", err)
+		} else {
+			tx := db.Begin()
+			defer func() {
+				if r := recover(); r != nil {
+					tx.Rollback()
+				}
+			}()
+
+			for _, order := range orders {
+				if err := updateOrder(tx, order); err != nil {
+					log.Printf("Error updating category with ID %d: %v", order.ID, err)
+					tx.Rollback()
+					break
+				}
+			}
+
+			if err := tx.Commit().Error; err != nil {
+				log.Printf("Error committing transaction for categories: %v", err)
+			} else {
+				log.Println("Categories updated in the database.")
+				done <- true
+			}
+		}
+
+		time.Sleep(30 * time.Minute)
+	}
+}
+
+func updateOrder(tx *gorm.DB, updOrder ServiceDetails) error {
+	var existingOrder ServiceDetails
+	result := tx.Where("id = ?", updOrder.ID).First(&existingOrder)
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return tx.Create(&updOrder).Error
+		}
+		return result.Error
+	}
+
+	if existingOrder.Status != updOrder.Status || existingOrder.StartCount != updOrder.StartCount || existingOrder.Remains != updOrder.Remains {
+		return tx.Model(&existingOrder).Updates(ServiceDetails{Status: updOrder.Status, StartCount: updOrder.StartCount, Remains: updOrder.Remains}).Error
+	}
+
+	return nil
+}
