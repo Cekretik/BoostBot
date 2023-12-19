@@ -59,7 +59,7 @@ func fetchSubcategoriesFromAPI(categoryID string) ([]Subcategory, error) {
 	return subcategories, nil
 }
 
-func fetchServicesFromAPI(subcategoryID string) ([]Service, error) {
+func fetchServicesFromAPI(subcategoryID string) ([]Services, error) {
 	apiUrl := fmt.Sprintf(apiServicesEndpointFormat, subcategoryID)
 	resp, err := http.Get(apiUrl)
 	if err != nil {
@@ -72,14 +72,16 @@ func fetchServicesFromAPI(subcategoryID string) ([]Service, error) {
 		return nil, err
 	}
 
-	//fmt.Println(string(body))
+	// fmt.Println(string(body))
 
-	var services []Service
-	err = json.Unmarshal(body, &services)
+	var response struct {
+		Services []Services `json:"services"`
+	}
+	err = json.Unmarshal(body, &response)
 	if err != nil {
 		fmt.Println("Error unmarshalling JSON:", err)
 		return nil, err
 	}
 
-	return services, nil
+	return response.Services, nil
 }

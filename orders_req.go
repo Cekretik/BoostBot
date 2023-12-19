@@ -42,7 +42,7 @@ func fetchOrders() ([]ServiceDetails, error) {
 	return serviceDetails, nil
 }
 
-func createOrder(order Order, token string) (Order, error) {
+func createOrder(order Order, token string) (UserOrders, error) {
 	client := &http.Client{}
 	// Создание данных для запроса из структуры Order
 	data := map[string]interface{}{
@@ -73,12 +73,12 @@ func createOrder(order Order, token string) (Order, error) {
 
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return Order{}, err
+		return UserOrders{}, err
 	}
 
 	req, err := http.NewRequest("POST", apiOrdersEndpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return Order{}, err
+		return UserOrders{}, err
 	}
 
 	req.Header.Add("Authorization", token)
@@ -86,13 +86,13 @@ func createOrder(order Order, token string) (Order, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return Order{}, err
+		return UserOrders{}, err
 	}
 	defer resp.Body.Close()
 
-	var responseOrder Order
+	var responseOrder UserOrders
 	if err := json.NewDecoder(resp.Body).Decode(&responseOrder); err != nil {
-		return Order{}, err
+		return UserOrders{}, err
 	}
 
 	return responseOrder, nil

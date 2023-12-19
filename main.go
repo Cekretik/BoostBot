@@ -27,6 +27,7 @@ func main() {
 	go UpdateSubcategoriesInDB(db, doneCategories)
 	go UpdateServicesInDB(db, doneCategories)
 	go UpdateUsersOrdersInDB(db, doneOrder)
+	go updateOrdersPeriodically(db, doneOrder)
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
@@ -128,7 +129,7 @@ func main() {
 						bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении данных сервиса."))
 						continue
 					}
-					handlePurchase(bot, chatID, service)
+					handlePurchase(db, bot, chatID, service)
 				} else {
 					bot.Send(tgbotapi.NewMessage(chatID, "Ваш запрос не может быть обработан. Пожалуйста, начните процесс заново."))
 				}

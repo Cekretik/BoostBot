@@ -235,7 +235,7 @@ func CreateServiceKeyboard(db *gorm.DB, subcategoryID, currentPage, totalService
 	return tgbotapi.NewInlineKeyboardMarkup(rows...), nil
 }
 
-func FormatServiceInfo(service Service, subcategory Subcategory) string {
+func FormatServiceInfo(service Services, subcategory Subcategory) string {
 	return fmt.Sprintf(
 		"ℹ️ Информация об услуге\n\n"+
 			"🔢 ID услуги: %d\n"+
@@ -269,8 +269,9 @@ func handleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
 }
 
 func handleOrdersCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
-	var orders []ServiceDetails
-	result := db.Where("telegram_chat_id = ?", chatID).Find(&orders)
+	var userOrders []UserOrders
+	chatIDString := strconv.FormatInt(chatID, 10) // Преобразование chatID в строку
+	result := db.Where("user_id = ?", chatIDString).Find(&userOrders)
 
 	if result.Error != nil {
 		log.Printf("Ошибка при получении заказов пользователя: %v", result.Error)
@@ -278,17 +279,34 @@ func handleOrdersCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 		return
 	}
 
-	if len(orders) == 0 {
+	if len(userOrders) == 0 {
 		bot.Send(tgbotapi.NewMessage(chatID, "Вы еще не совершали покупок."))
 		return
 	}
 
 	messageText := "📝 Ваши заказы:\n\n"
-	for _, order := range orders {
-		messageText += fmt.Sprintf("Услуга номер: %d", order.ServiceID)
-		// Дополнительная информация о заказе
+	for _, order := range userOrders {
+		status := translateOrderStatus(order.Status)
+		messageText += fmt.Sprintf("Номер услуги: %s\nСсылка: %s\nКоличество: %d\nСтатус: %s\n\n",
+			order.ServiceID, order.Link, order.Quantity, status)
 	}
 
 	msg := tgbotapi.NewMessage(chatID, messageText)
 	bot.Send(msg)
+}
+
+// translateOrderStatus переводит статус заказа на русский язык
+func translateOrderStatus(status string) string {
+	switch status {
+	case "PENDING":
+		return "Ожидание"
+	case "COMPLETED":
+		return "Выполнен"
+	case "IN_PROGRESS":
+		return "В процессе"
+	case "PARTIAL":
+		return "Частично выполнен"
+	default:
+		return "Неизвестный статус"
+	}
 }

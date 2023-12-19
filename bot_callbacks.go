@@ -225,7 +225,7 @@ func GetTotalPagesForCategory(db *gorm.DB, itemsPerPage int, categoryID string) 
 
 func GetTotalPagesForService(db *gorm.DB, itemsPerPage int, subcategoryID string) (int, error) {
 	var totalServices int64
-	if err := db.Model(&Service{}).Where("category_id = ?", subcategoryID).Count(&totalServices).Error; err != nil {
+	if err := db.Model(&Services{}).Where("category_id = ?", subcategoryID).Count(&totalServices).Error; err != nil {
 		return 0, err
 	}
 
