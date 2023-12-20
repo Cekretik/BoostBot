@@ -46,6 +46,7 @@ func createOrder(order Order, token string) (UserOrders, error) {
 	client := &http.Client{}
 	// Создание данных для запроса из структуры Order
 	data := map[string]interface{}{
+		"id":            order.ID,
 		"serviceId":     order.ServiceID,
 		"link":          order.Link,
 		"quantity":      order.Quantity,

@@ -22,7 +22,7 @@ func InitDB() (*gorm.DB, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&UserState{}, &Category{}, &Subcategory{}, &Services{}, &ServiceDetails{}, &UserOrders{})
+	err = db.AutoMigrate(&UserState{}, &Category{}, &Subcategory{}, &Services{}, &UserOrders{})
 	if err != nil {
 		return nil, err
 	}
@@ -323,12 +323,15 @@ func updateService(tx *gorm.DB, newService Services) error {
 	return nil
 }
 
-func UpdateUsersOrdersInDB(db *gorm.DB, done chan bool) {
+func updateOrdersPeriodically(db *gorm.DB, done chan bool) {
 	for {
-		orders, err := fetchOrders()
-		if err != nil {
-			log.Printf("Error fetching categories from API: %v", err)
-		} else {
+		for {
+			serviceDetails, err := fetchOrders()
+			if err != nil {
+				log.Printf("Error fetching orders from API: %v", err)
+				continue
+			}
+
 			tx := db.Begin()
 			defer func() {
 				if r := recover(); r != nil {
@@ -336,110 +339,55 @@ func UpdateUsersOrdersInDB(db *gorm.DB, done chan bool) {
 				}
 			}()
 
-			for _, order := range orders {
-				if err := updateOrder(tx, order); err != nil {
-					log.Printf("Error updating category with ID %d: %v", order.ID, err)
-					tx.Rollback()
-					break
-				}
-			}
-
-			if err := tx.Commit().Error; err != nil {
-				log.Printf("Error committing transaction for orders: %v", err)
-			} else {
-				log.Println("Orders updated in the database.")
-
-			}
-		}
-
-		time.Sleep(30 * time.Minute)
-	}
-}
-
-func updateOrder(tx *gorm.DB, updOrder ServiceDetails) error {
-	var existingOrder ServiceDetails
-	result := tx.Where("order_id = ?", updOrder.ID).First(&existingOrder)
-
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return tx.Create(&updOrder).Error
-		}
-		return result.Error
-	}
-
-	if existingOrder.Status != updOrder.Status || existingOrder.StartCount != updOrder.StartCount || existingOrder.Remains != updOrder.Remains {
-		return tx.Model(&existingOrder).Updates(ServiceDetails{Status: updOrder.Status, StartCount: updOrder.StartCount, Remains: updOrder.Remains}).Error
-	}
-
-	return nil
-}
-
-func updateOrdersPeriodically(db *gorm.DB, done chan bool) {
-	for {
-		serviceDetails, err := fetchOrders()
-		if err != nil {
-			log.Printf("Error fetching orders from API: %v", err)
-			continue
-		}
-
-		tx := db.Begin()
-		defer func() {
-			if r := recover(); r != nil {
-				tx.Rollback()
-			}
-		}()
-
-		for _, detail := range serviceDetails {
-			var order UserOrders
-			if err := tx.Where("order_id = ?", detail.ID).First(&order).Error; err != nil {
-				log.Printf("Error finding order with ID %d: %v", detail.ID, err)
-				continue
-			}
-
-			order.Status = detail.Status
-			order.Remains = detail.Remains
-			order.Charge = detail.Charge
-			order.StartCount = detail.StartCount
-
-			if err := tx.Save(&order).Error; err != nil {
-				log.Printf("Error updating order with ID %d: %v", detail.ID, err)
-				tx.Rollback()
-				break
-			}
-
-			if order.Status == "CANCELED" || order.Status == "PARTIAL" {
-				var user UserState
-				if err := tx.Where("user_id = ?", order.ChatID).First(&user).Error; err != nil {
-					log.Printf("Error finding user with ChatID %s: %v", order.ChatID, err)
+			for _, detail := range serviceDetails {
+				var order UserOrders
+				if err := tx.Where("order_id = ?", detail.ID).First(&order).Error; err != nil {
+					log.Printf("Error finding order with ID %d: %v", detail.ID, err)
 					continue
 				}
 
-				var refundAmount float64
-				if order.Status == "CANCELED" {
-					refundAmount = order.Cost
-				} else if order.Status == "PARTIAL" {
-					refundAmount = (float64(detail.Remains) / 1000.0) * detail.Charge
-				}
+				if order.Status != detail.Status || order.Remains != detail.Remains || order.Charge != detail.Charge || order.StartCount != detail.StartCount {
+					order.Status = detail.Status
+					order.Remains = detail.Remains
+					order.Charge = detail.Charge
+					order.StartCount = detail.StartCount
 
-				user.Balance += refundAmount
-				if err := tx.Save(&user).Error; err != nil {
-					log.Printf("Error updating user balance for ChatID %d: %v", user.UserID, err)
-					tx.Rollback()
-					break
-				}
+					if err := tx.Save(&order).Error; err != nil {
+						log.Printf("Error updating order with ID %d: %v", detail.ID, err)
+						tx.Rollback()
+						break
+					}
 
-				if err := tx.Commit().Error; err != nil {
-					log.Printf("Error committing transaction for updating orders: %v", err)
-				} else {
-					log.Println("User orders updated in the database.")
-				}
+					if order.Status == "CANCELED" || order.Status == "PARTIAL" {
+						var user UserState
+						if err := tx.Where("user_id = ?", order.ChatID).First(&user).Error; err != nil {
+							log.Printf("Error finding user with ChatID %s: %v", order.ChatID, err)
+							continue
+						}
 
-				select {
-				case <-done:
-					return
-				default:
-					time.Sleep(30 * time.Minute)
+						var refundAmount float64
+						if order.Status == "CANCELED" {
+							refundAmount = order.Cost
+						} else if order.Status == "PARTIAL" {
+							refundAmount = (float64(detail.Remains) / 1000.0) * detail.Charge
+						}
+
+						user.Balance += refundAmount
+						if err := tx.Save(&user).Error; err != nil {
+							log.Printf("Error updating user balance for ChatID %d: %v", user.UserID, err)
+							tx.Rollback()
+							break
+						}
+
+						if err := tx.Commit().Error; err != nil {
+							log.Printf("Error committing transaction for updating orders: %v", err)
+						} else {
+							log.Println("User orders updated in the database.")
+						}
+
+					}
 				}
+				time.Sleep(90 * time.Second)
 			}
 		}
 	}

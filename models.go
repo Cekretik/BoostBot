@@ -43,6 +43,7 @@ type Services struct {
 
 // Struct for POST orders
 type Order struct {
+	ID           int    `json:"id"`
 	ChatID       string `json:"userId"`
 	ServiceID    string `json:"serviceId"`
 	Link         string `json:"link"`
@@ -76,7 +77,7 @@ type ServiceDetails struct {
 type UserOrders struct {
 	gorm.Model
 	ChatID      string  `gorm:"column:user_id" json:"userId"`
-	OrderID     int     `gorm:"column:order_id" json:"orderId"`
+	OrderID     int     `gorm:"column:order_id" json:"id"`
 	ServiceID   string  `gorm:"column:service_id" json:"serviceId"`
 	Cost        float64 `gorm:"column:cost" json:"cost"`
 	ServiceType string  `gorm:"column:service_type" json:"serviceType"`

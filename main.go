@@ -26,7 +26,6 @@ func main() {
 	go UpdateCategoriesInDB(db, doneCategories)
 	go UpdateSubcategoriesInDB(db, doneCategories)
 	go UpdateServicesInDB(db, doneCategories)
-	go UpdateUsersOrdersInDB(db, doneOrder)
 	go updateOrdersPeriodically(db, doneOrder)
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60

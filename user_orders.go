@@ -75,8 +75,6 @@ func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 		}
 
 		if user.Balance >= cost {
-			user.Balance -= cost
-			db.Save(&user)
 			keyboard := tgbotapi.NewInlineKeyboardMarkup(
 				tgbotapi.NewInlineKeyboardRow(
 					tgbotapi.NewInlineKeyboardButtonData("💰Купить", "buy"),
@@ -118,6 +116,20 @@ func handlePurchase(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, service Ser
 	}
 	userStatus.PendingServiceID = strconv.Itoa(service.ID)
 
+	var user UserState
+	if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {
+		bot.Send(tgbotapi.NewMessage(chatID, "Произошла ошибка при доступе к вашему балансу."))
+		return
+	}
+
+	cost := (float64(userStatus.Quantity) / 1000.0) * service.Rate
+	if user.Balance < cost {
+		bot.Send(tgbotapi.NewMessage(chatID, "На вашем балансе недостаточно средств для оформления заказа."))
+		return
+	}
+	user.Balance -= cost
+	db.Save(&user)
+
 	order := Order{
 		ServiceID: userStatus.PendingServiceID,
 		Link:      userStatus.Link,
@@ -127,6 +139,7 @@ func handlePurchase(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, service Ser
 	// Отправка заказа
 	createdOrder, err := createOrder(order, token)
 	if err != nil {
+		user.Balance += cost
 		bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Ошибка при создании заказа: %s", err.Error())))
 		return
 	}
