@@ -62,7 +62,7 @@ type Order struct {
 
 // Struct of users who have orders
 type ServiceDetails struct {
-	ID          int     `json:"order_id"`
+	ID          int     `json:"id"`
 	ServiceID   int     `json:"serviceId"`
 	Cost        float64 `json:"cost"`
 	ServiceType string  `json:"serviceType"`
