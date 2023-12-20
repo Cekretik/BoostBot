@@ -325,70 +325,63 @@ func updateService(tx *gorm.DB, newService Services) error {
 
 func updateOrdersPeriodically(db *gorm.DB, done chan bool) {
 	for {
-		for {
-			serviceDetails, err := fetchOrders()
-			if err != nil {
-				log.Printf("Error fetching orders from API: %v", err)
+		serviceDetails, err := fetchOrders()
+		if err != nil {
+			log.Printf("Error fetching orders from API: %v", err)
+			continue
+		}
+
+		tx := db.Begin()
+
+		for _, detail := range serviceDetails {
+			var order UserOrders
+			if err := tx.Where("order_id = ?", detail.ID).First(&order).Error; err != nil {
+				log.Printf("Error finding order with ID %d: %v", detail.ID, err)
 				continue
 			}
 
-			tx := db.Begin()
-			defer func() {
-				if r := recover(); r != nil {
-					tx.Rollback()
-				}
-			}()
+			// Обновляем поля заказа, если они изменились
+			if order.Status != detail.Status || order.Remains != detail.Remains ||
+				order.Charge != detail.Charge || order.StartCount != detail.StartCount {
+				order.Status = detail.Status
+				order.Remains = detail.Remains
+				order.Charge = detail.Charge
+				order.StartCount = detail.StartCount
+				tx.Save(&order)
+			}
 
-			for _, detail := range serviceDetails {
-				var order UserOrders
-				if err := tx.Where("order_id = ?", detail.ID).First(&order).Error; err != nil {
-					log.Printf("Error finding order with ID %d: %v", detail.ID, err)
+			// Возврат средств
+			if order.Status == "CANCELED" || order.Status == "PARTIAL" {
+				var user UserState
+				if err := tx.Where("user_id = ?", order.ChatID).First(&user).Error; err != nil {
+					log.Printf("Error finding user with ChatID %s: %v", order.ChatID, err)
 					continue
 				}
 
-				if order.Status != detail.Status || order.Remains != detail.Remains || order.Charge != detail.Charge || order.StartCount != detail.StartCount {
-					order.Status = detail.Status
-					order.Remains = detail.Remains
-					order.Charge = detail.Charge
-					order.StartCount = detail.StartCount
-
-					if err := tx.Save(&order).Error; err != nil {
-						log.Printf("Error updating order with ID %d: %v", detail.ID, err)
-						tx.Rollback()
-						break
-					}
-
-					if order.Status == "CANCELED" || order.Status == "PARTIAL" {
-						var user UserState
-						if err := tx.Where("user_id = ?", order.ChatID).First(&user).Error; err != nil {
-							log.Printf("Error finding user with ChatID %s: %v", order.ChatID, err)
-							continue
-						}
-
-						var refundAmount float64
-						if order.Status == "CANCELED" {
-							refundAmount = order.Cost
-						} else if order.Status == "PARTIAL" {
-							refundAmount = (float64(detail.Remains) / 1000.0) * detail.Charge
-						}
-
-						user.Balance += refundAmount
-						if err := tx.Save(&user).Error; err != nil {
-							log.Printf("Error updating user balance for ChatID %d: %v", user.UserID, err)
-							tx.Rollback()
-							break
-						}
-
-						if err := tx.Commit().Error; err != nil {
-							log.Printf("Error committing transaction for updating orders: %v", err)
-						} else {
-							log.Println("User orders updated in the database.")
-						}
-
-					}
+				var refundAmount float64
+				if order.Status == "CANCELED" {
+					refundAmount = order.Cost
+				} else if order.Status == "PARTIAL" {
+					refundAmount = (float64(detail.Remains) / 1000.0) * detail.Charge
 				}
-				time.Sleep(90 * time.Second)
+
+				user.Balance += refundAmount
+				tx.Save(&user)
 			}
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			log.Printf("Error committing transaction for updating orders: %v", err)
+			tx.Rollback()
+		} else {
+			log.Println("User orders updated in the database.")
+		}
+
+		select {
+		case <-done:
+			return
+		default:
+			time.Sleep(90 * time.Second)
 		}
 	}
 }
