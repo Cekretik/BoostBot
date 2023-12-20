@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"gorm.io/gorm"
@@ -42,13 +43,22 @@ func handleOrderCommand(bot *tgbotapi.BotAPI, chatID int64, service Services) {
 	bot.Send(msg)
 }
 
+func isValidURL(url string) bool {
+	return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
+}
+
 func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, service Services) {
 	chatID := update.Message.Chat.ID
 	userStatus := getUserStatus(chatID)
 
 	switch userStatus.CurrentState {
 	case "awaitingLink":
-		userStatus.Link = update.Message.Text
+		link := update.Message.Text
+		if !isValidURL(link) {
+			bot.Send(tgbotapi.NewMessage(chatID, "Введите ссылку корректно."))
+			return
+		}
+		userStatus.Link = link
 		userStatus.CurrentState = "awaitingQuantity"
 		msgText := fmt.Sprintf("Введите количество. Минимальное: %d, максимальное: %d.", service.Min, service.Max)
 		msg := tgbotapi.NewMessage(chatID, msgText)
@@ -85,7 +95,7 @@ func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 					tgbotapi.NewKeyboardButton("Отмена"),
 				),
 			)
-			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Цена услуги: $%g. Ваш баланс: $%g.", cost, user.Balance))
+			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Цена услуги: $%.5f. Ваш баланс: $%.5f.", cost, user.Balance))
 			msg.ReplyMarkup = cancelKeyboard
 			msg.ReplyMarkup = keyboard
 			bot.Send(msg)
@@ -100,7 +110,7 @@ func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 					tgbotapi.NewKeyboardButton("Отмена"),
 				),
 			)
-			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("На вашем балансе недостаточно средств. Цена услуги: $%g. Ваш баланс: $%g.", cost, user.Balance))
+			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("На вашем балансе недостаточно средств. Цена услуги: $%.5f. Ваш баланс: $%.5f.", cost, user.Balance))
 			msg.ReplyMarkup = cancelKeyboard
 			msg.ReplyMarkup = keyboard
 			bot.Send(msg)

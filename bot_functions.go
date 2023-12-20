@@ -255,7 +255,7 @@ func handleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
 		return
 	}
 
-	balanceMsgText := fmt.Sprintf("🆔 Ваш ID: %d\n💵 Ваш баланс: $%g", userState.UserID, userState.Balance)
+	balanceMsgText := fmt.Sprintf("🆔 Ваш ID: %d\n💵 Ваш баланс: $%.5f", userState.UserID, userState.Balance)
 	msg := tgbotapi.NewMessage(userID, balanceMsgText)
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
