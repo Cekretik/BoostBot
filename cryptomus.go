@@ -50,7 +50,6 @@ func init() {
 		log.Fatal("Error loading .env file")
 	}
 
-	// Инициализация глобальных переменных
 	urlCallback = os.Getenv("URL_CALLBACK")
 	merchant = os.Getenv("CRYPTOMUS_MERCHANT")
 	apiKey = os.Getenv("CRYPTOMUS_APIKEY")
