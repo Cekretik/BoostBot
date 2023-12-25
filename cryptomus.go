@@ -43,6 +43,7 @@ type PaymentInfoResponse struct {
 
 var merchant string
 var apiKey string
+var urlCallback string
 
 func init() {
 	if err := godotenv.Load(); err != nil {
@@ -50,6 +51,7 @@ func init() {
 	}
 
 	// Инициализация глобальных переменных
+	urlCallback = os.Getenv("URL_CALLBACK")
 	merchant = os.Getenv("CRYPTOMUS_MERCHANT")
 	apiKey = os.Getenv("CRYPTOMUS_APIKEY")
 }
@@ -73,7 +75,7 @@ func CreatePayment(amount, currency, orderID string) (*CryptomusPaymentResponse,
 		"amount":       amount,
 		"currency":     "USD",
 		"order_id":     orderID,
-		"url_callback": "http://localhost:8080/webhook",
+		"url_callback": urlCallback + "/webhook",
 	}
 
 	log.Printf("Request data: %+v", data)
