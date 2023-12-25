@@ -3,8 +3,10 @@ package main
 import (
 	"errors"
 	"log"
+	"os"
 	"time"
 
+	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -16,13 +18,18 @@ const (
 )
 
 func InitDB() (*gorm.DB, error) {
-	dsn := "host=localhost user=postgres password=gopher dbname=boostbot port=5432 sslmode=disable"
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	dsn := os.Getenv("DSN")
+
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&UserState{}, &Category{}, &Subcategory{}, &Services{}, &UserOrders{})
+	err = db.AutoMigrate(&UserState{}, &Category{}, &Subcategory{}, &Services{}, &UserOrders{}, &RefundedOrder{}, &Payments{})
 	if err != nil {
 		return nil, err
 	}
@@ -350,8 +357,20 @@ func updateOrdersPeriodically(db *gorm.DB, done chan bool) {
 				tx.Save(&order)
 			}
 
+			if order.Status != "PARTIAL" && order.Status != "CANCELED" && order.Status != "COMPLETED" && order.Status != "IN_PROGRESS" {
+				order.Status = "PENDING"
+				tx.Save(&order)
+			}
+
 			// Возврат средств
 			if order.Status == "CANCELED" || order.Status == "PARTIAL" {
+				// Проверяем, был ли этот заказ уже возвращен
+				var refundedOrder RefundedOrder
+				if err := tx.Where("order_id = ?", order.ID).First(&refundedOrder).Error; err == nil {
+					// Заказ уже возвращен, пропускаем его
+					continue
+				}
+
 				var user UserState
 				if err := tx.Where("user_id = ?", order.ChatID).First(&user).Error; err != nil {
 					log.Printf("Error finding user with ChatID %s: %v", order.ChatID, err)
@@ -367,6 +386,9 @@ func updateOrdersPeriodically(db *gorm.DB, done chan bool) {
 
 				user.Balance += refundAmount
 				tx.Save(&user)
+
+				// Добавляем запись о возврате заказа в базу данных
+				tx.Create(&RefundedOrder{OrderID: order.ID})
 			}
 		}
 
@@ -384,4 +406,13 @@ func updateOrdersPeriodically(db *gorm.DB, done chan bool) {
 			time.Sleep(30 * time.Minute)
 		}
 	}
+}
+
+func updatePaymentStatusInDB(db *gorm.DB, orderID, status string) error {
+	var payment Payments
+	if err := db.Where("order_id = ?", orderID).First(&payment).Error; err != nil {
+		return err
+	}
+	payment.Status = status
+	return db.Save(&payment).Error
 }

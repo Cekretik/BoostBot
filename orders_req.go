@@ -4,14 +4,26 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
+	"os"
+
+	"github.com/joho/godotenv"
 )
 
-const (
-	apiOrdersEndpoint string = "https://api.stagesmm.com/orders"
-	token             string = "VTJGc2RHVmtYMThJU0JpbmIwT2FlTE4yK1JoMWR3OWdBWW56SkxRM09MTG5YeERpNzdVS1lEd21qcCsza25xRm1zVHBzK3gwY0dDVFdjN2FUQzFZZXNoamNVRENTRlBJTWpPcFV2QXBhaUE9"
-)
+var apiOrdersEndpoint string
+var token string
 
+func init() {
+	// Загрузка переменных окружения
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	// Инициализация глобальных переменных
+	apiOrdersEndpoint = os.Getenv("API_ORDERS_ENDPOINT")
+	token = os.Getenv("STAGESMM_TOKEN")
+}
 func fetchOrders() ([]ServiceDetails, error) {
 
 	client := &http.Client{}

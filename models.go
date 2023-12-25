@@ -88,3 +88,16 @@ type UserOrders struct {
 	StartCount  int     `gorm:"column:start_count" json:"startCount"`
 	Remains     int     `gorm:"column:remains" json:"remains"`
 }
+
+type RefundedOrder struct {
+	OrderID uint `gorm:"primaryKey"`
+}
+
+type Payments struct {
+	ChatID  int     `gorm:"column:user_id" json:"userId"`
+	OrderID string  `gorm:"column:orderID" json:"order_id"`
+	Amount  float64 `gorm:"column:amount" json:"amount"`
+	Url     string  `gorm:"column:url" json:"url"`
+	Status  string  `gorm:"column:status" json:"status"`
+	Type    string  `gorm:"column:type" json:"type"`
+}

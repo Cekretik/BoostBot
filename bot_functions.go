@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 )
 
@@ -41,6 +43,22 @@ func sendStandardKeyboard(bot *tgbotapi.BotAPI, chatID int64) {
 	msg.ReplyMarkup = quickReplyMarkup
 	bot.Send(msg)
 }
+
+func sendStandardKeyboardAfterPayment(bot *tgbotapi.BotAPI, chatID int64) {
+	messageText := "После оплаты проверьте баланс."
+	msg := tgbotapi.NewMessage(chatID, messageText)
+	balanceButton := tgbotapi.NewKeyboardButton("💰Баланс")
+	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
+	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
+	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(balanceButton),
+		tgbotapi.NewKeyboardButtonRow(ordersButton),
+		tgbotapi.NewKeyboardButtonRow(makeOrderButton),
+	)
+
+	msg.ReplyMarkup = quickReplyMarkup
+	bot.Send(msg)
+}
 func WelcomeMessage(bot *tgbotapi.BotAPI, chatID int64) {
 	messageText := "Добро пожаловать!"
 	msg := tgbotapi.NewMessage(chatID, messageText)
@@ -58,12 +76,17 @@ func WelcomeMessage(bot *tgbotapi.BotAPI, chatID int64) {
 }
 
 func SendSubscriptionMessage(bot *tgbotapi.BotAPI, chatID int64) {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	channelLink := os.Getenv("CHANNEL_LINK")
 	messageText := "Чтобы пользоваться ботом, вам нужно подписаться на каналы. После подписки заново напишите /start"
 	msg := tgbotapi.NewMessage(chatID, messageText)
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL("Подписаться на канал", "https://t.me/botixaforcheck"),
+			tgbotapi.NewInlineKeyboardButtonURL("Подписаться на канал", channelLink),
 		),
 	)
 	msg.ReplyMarkup = keyboard
@@ -241,10 +264,10 @@ func FormatServiceInfo(service Services, subcategory Subcategory) string {
 			"🔢 ID услуги: %d\n"+
 			"📝 Услга: %s\n\n"+
 			"📝Категория:%s\n\n"+
-			"💸 Цена за 1000: $%g\n\n"+
+			"💸 Цена за 1000: $%.*f\n\n"+
 			"📉 Минимальное количество: %d\n"+
 			"📈 Максимальное количество: %d",
-		service.ID, service.Name, subcategory.Name, service.Rate, service.Min, service.Max)
+		service.ID, service.Name, subcategory.Name, decimalPlaces, service.Rate, service.Min, service.Max)
 }
 
 // Функция для обработки нажатия кнопки "Баланс"
@@ -255,7 +278,7 @@ func handleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
 		return
 	}
 
-	balanceMsgText := fmt.Sprintf("🆔 Ваш ID: %d\n💵 Ваш баланс: $%.5f", userState.UserID, userState.Balance)
+	balanceMsgText := fmt.Sprintf("🆔 Ваш ID: %d\n💵 Ваш баланс: $%.*f", userState.UserID, decimalPlaces, userState.Balance)
 	msg := tgbotapi.NewMessage(userID, balanceMsgText)
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
@@ -306,6 +329,8 @@ func translateOrderStatus(status string) string {
 		return "В процессе"
 	case "PARTIAL":
 		return "Частично выполнен"
+	case "CANCELED":
+		return "Отменен"
 	default:
 		return "Неизвестный статус"
 	}

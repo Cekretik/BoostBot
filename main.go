@@ -2,25 +2,38 @@ package main
 
 import (
 	"log"
+	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/joho/godotenv"
 )
 
-var channelID int64 = -1002105354472
+// var channelID int64 = -1002105354472
+var decimalPlaces = 4
 
 func main() {
-	bot, err := tgbotapi.NewBotAPI("6497443652:AAHYg2UaQCZuOn1BF3jXllnyMldoXzAERFs")
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	token := os.Getenv("TOKEN_BOT")
+	channelIDStr := os.Getenv("CHANNEL_ID")
+	channelID, err := strconv.ParseInt(channelIDStr, 10, 64)
+	if err != nil {
+		log.Fatalf("Error parsing CHANNEL_ID: %v", err)
+	}
+
+	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		log.Panic(err)
 	}
-
 	db, err := InitDB()
 	if err != nil {
 		log.Panic(err)
 	}
-
 	doneCategories := make(chan bool)
 	doneOrder := make(chan bool)
 	go UpdateCategoriesInDB(db, doneCategories)
@@ -29,16 +42,30 @@ func main() {
 	go updateOrdersPeriodically(db, doneOrder)
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
-
 	updates, err := bot.GetUpdatesChan(u)
 	if err != nil {
 		log.Panic(err)
 	}
 	itemsPerPage := 10
 
+	go func() {
+		if err := http.ListenAndServe(":8081", nil); err != nil {
+			log.Fatalf("Failed to start HTTP server: %v", err)
+		}
+	}()
+	go startHTTPServer(bot, db)
+
 	for update := range updates {
 		if update.CallbackQuery != nil {
 			callbackData := update.CallbackQuery.Data
+			switch callbackData {
+			case "replenishBalance":
+				handleReplenishCommand(bot, update.CallbackQuery.Message.Chat.ID)
+				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
+			case "cryptomus":
+				handleCryptomusButton(bot, update.CallbackQuery.Message.Chat.ID)
+				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
+			}
 			if strings.HasPrefix(callbackData, "subcategory:") || strings.HasPrefix(callbackData, "prevServ:") || strings.HasPrefix(callbackData, "nextServ:") {
 				var subcategoryID string
 				if strings.HasPrefix(callbackData, "subcategory:") {
@@ -138,18 +165,24 @@ func main() {
 		// Обработка обычных сообщений
 		if update.Message != nil {
 			chatID := update.Message.Chat.ID
-
+			userPaymentStatus, exists := userPaymentStatuses[chatID]
 			// Обработка команды "Отмена"
 			if update.Message.Text == "Отмена" {
 				if _, exists := userStatuses[chatID]; exists {
 					delete(userStatuses, chatID)
-					delete(userStatuses, chatID)
+					sendStandardKeyboard(bot, chatID)
+					continue
+				} else if _, exists := userPaymentStatuses[chatID]; exists {
+					delete(userPaymentStatuses, chatID)
 					sendStandardKeyboard(bot, chatID)
 					continue
 				}
 			}
 
-			// Проверяем, находится ли пользователь в процессе заказа
+			if exists && userPaymentStatus.CurrentState == "awaitingAmount" {
+				handlePaymentInput(db, bot, chatID, update.Message.Text)
+				continue
+			}
 			if userStatus, exists := userStatuses[chatID]; exists && userStatus.CurrentState != "" {
 				serviceID, err := strconv.Atoi(userStatus.PendingServiceID)
 				if err != nil {

@@ -15,6 +15,8 @@ type UserStatus struct {
 	PendingServiceID string
 	Link             string
 	Quantity         int
+	ReplenishAmount  float64
+	OrderID          string
 }
 
 var userStatuses map[int64]*UserStatus = make(map[int64]*UserStatus)
@@ -95,14 +97,14 @@ func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 					tgbotapi.NewKeyboardButton("Отмена"),
 				),
 			)
-			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Цена услуги: $%.5f. Ваш баланс: $%.5f.", cost, user.Balance))
+			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Цена услуги: $%.*f. Ваш баланс: $%.*f.", decimalPlaces, cost, decimalPlaces, user.Balance))
 			msg.ReplyMarkup = cancelKeyboard
 			msg.ReplyMarkup = keyboard
 			bot.Send(msg)
 		} else {
 			keyboard := tgbotapi.NewInlineKeyboardMarkup(
 				tgbotapi.NewInlineKeyboardRow(
-					tgbotapi.NewInlineKeyboardButtonData("💳 Пополнить баланс", "replenish"),
+					tgbotapi.NewInlineKeyboardButtonData("💰Пополнить баланс", "replenishBalance"),
 				),
 			)
 			cancelKeyboard := tgbotapi.NewReplyKeyboard(
@@ -110,7 +112,7 @@ func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 					tgbotapi.NewKeyboardButton("Отмена"),
 				),
 			)
-			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("На вашем балансе недостаточно средств. Цена услуги: $%.5f. Ваш баланс: $%.5f.", cost, user.Balance))
+			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("На вашем балансе недостаточно средств. Цена услуги: $%.*f. Ваш баланс: $%.*f.", decimalPlaces, cost, decimalPlaces, user.Balance))
 			msg.ReplyMarkup = cancelKeyboard
 			msg.ReplyMarkup = keyboard
 			bot.Send(msg)
