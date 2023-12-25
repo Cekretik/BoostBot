@@ -53,7 +53,7 @@ func main() {
 			log.Fatalf("Failed to start HTTP server: %v", err)
 		}
 	}()
-	go startHTTPServer(bot, db)
+	go startHTTPServer(db)
 
 	for update := range updates {
 		if update.CallbackQuery != nil {

@@ -95,7 +95,7 @@ type RefundedOrder struct {
 
 type Payments struct {
 	ChatID  int     `gorm:"column:user_id" json:"userId"`
-	OrderID string  `gorm:"column:orderID" json:"order_id"`
+	OrderID string  `gorm:"column:order_id" json:"order_id"`
 	Amount  float64 `gorm:"column:amount" json:"amount"`
 	Url     string  `gorm:"column:url" json:"url"`
 	Status  string  `gorm:"column:status" json:"status"`

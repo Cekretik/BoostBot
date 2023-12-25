@@ -29,12 +29,30 @@ type CreatePaymentRequest struct {
 var userPaymentStatuses map[int64]*UserPaymentStatus = make(map[int64]*UserPaymentStatus)
 
 type CryptomusWebhookData struct {
-	UUID          string `json:"uuid"`
-	OrderID       string `json:"order_id"`
-	PaymentStatus string `json:"payment_status"`
-	Amount        string `json:"amount"`
-	Currency      string `json:"currency"`
-	UrlCallback   string `json:"url_callback"`
+	Type              string `json:"type"`
+	UUID              string `json:"uuid"`
+	OrderID           string `json:"order_id"`
+	Amount            string `json:"amount"`
+	PaymentAmount     string `json:"payment_amount"`
+	PaymentAmountUSD  string `json:"payment_amount_usd"`
+	MerchantAmount    string `json:"merchant_amount"`
+	Commission        string `json:"commission"`
+	IsFinal           bool   `json:"is_final"`
+	PaymentStatus     string `json:"status"`
+	From              string `json:"from"`
+	WalletAddressUUID string `json:"wallet_address_uuid"`
+	Network           string `json:"network"`
+	Currency          string `json:"currency"`
+	PayerCurrency     string `json:"payer_currency"`
+	AdditionalData    string `json:"additional_data"`
+	Convert           struct {
+		ToCurrency string `json:"to_currency"`
+		Commission string `json:"commission"`
+		Rate       string `json:"rate"`
+		Amount     string `json:"amount"`
+	} `json:"convert"`
+	TxID string `json:"txid"`
+	Sign string `json:"sign"`
 }
 
 func handleReplenishCommand(bot *tgbotapi.BotAPI, chatID int64) {
@@ -125,7 +143,7 @@ func createAndSendPaymentLink(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, a
 	}
 }
 
-func handleWebhook(bot *tgbotapi.BotAPI, db *gorm.DB, w http.ResponseWriter, r *http.Request) {
+func handleWebhook(db *gorm.DB, w http.ResponseWriter, r *http.Request) {
 	var webhookData CryptomusWebhookData
 	err := json.NewDecoder(r.Body).Decode(&webhookData)
 	if err != nil {
@@ -133,73 +151,23 @@ func handleWebhook(bot *tgbotapi.BotAPI, db *gorm.DB, w http.ResponseWriter, r *
 		log.Printf("Error decoding webhook request: %v", err)
 		return
 	}
-	chatID, err := extractChatIDFromOrderID(webhookData.OrderID)
-	if err != nil {
-		log.Printf("Error extracting chatID from orderID: %v", err)
+
+	orderID := webhookData.OrderID
+	var payment Payments
+	if err := db.Where("order_id = ?", orderID).First(&payment).Error; err != nil {
+		log.Printf("Error retrieving payment: %v", err)
 		return
 	}
 
-	if userStatus, exists := userPaymentStatuses[chatID]; exists {
-		userStatus.PaymentStatus = webhookData.PaymentStatus
-		userPaymentStatuses[chatID] = userStatus
-	}
 	switch webhookData.PaymentStatus {
 	case "paid":
-		orderID := webhookData.OrderID
-		chatID, err := extractChatIDFromOrderID(orderID)
-		if err != nil {
-			log.Printf("Error extracting chatID from orderID: %v", err)
-			return
+		if payment.Status != "paid" {
+			updatePaymentStatusInDB(db, orderID, "paid")
+			err = UpdateUserBalance(db, int64(payment.ChatID), payment.Amount)
+			if err != nil {
+				log.Printf("Error updating user balance: %v", err)
+			}
 		}
-		amount, err := strconv.ParseFloat(webhookData.Amount, 64)
-		if err != nil {
-			log.Printf("Error parsing amount: %v", err)
-			return
-		}
-		updatePaymentStatusInDB(db, orderID, "paid")
-
-		err = UpdateUserBalance(db, chatID, amount)
-		if err != nil {
-			log.Printf("Error updating user balance: %v", err)
-		}
-	case "check":
-		orderID := webhookData.OrderID
-		chatID, err := extractChatIDFromOrderID(orderID)
-		if err != nil {
-			log.Printf("Error extracting chatID from orderID: %v", err)
-			return
-		}
-		updatePaymentStatusInDB(db, orderID, "check")
-		err = UpdateUserBalance(db, chatID, 0)
-		if err != nil {
-			log.Printf("Error updating user balance: %v", err)
-		}
-	case "cancel":
-		orderID := webhookData.OrderID
-		chatID, err := extractChatIDFromOrderID(orderID)
-		if err != nil {
-			log.Printf("Error extracting chatID from orderID: %v", err)
-			return
-		}
-		updatePaymentStatusInDB(db, orderID, "cancel")
-		err = UpdateUserBalance(db, chatID, 0)
-		if err != nil {
-			log.Printf("Error updating user balance: %v", err)
-		}
-		delete(userPaymentStatuses, chatID)
-	case "fail":
-		orderID := webhookData.OrderID
-		chatID, err := extractChatIDFromOrderID(orderID)
-		if err != nil {
-			log.Printf("Error extracting chatID from orderID: %v", err)
-			return
-		}
-		updatePaymentStatusInDB(db, orderID, "fail")
-		err = UpdateUserBalance(db, chatID, 0)
-		if err != nil {
-			log.Printf("Error updating user balance: %v", err)
-		}
-		delete(userPaymentStatuses, chatID)
 	default:
 		log.Printf("Unhandled payment status %s for orderID %s", webhookData.PaymentStatus, webhookData.OrderID)
 	}
@@ -207,15 +175,6 @@ func handleWebhook(bot *tgbotapi.BotAPI, db *gorm.DB, w http.ResponseWriter, r *
 	w.WriteHeader(http.StatusOK)
 }
 
-func extractChatIDFromOrderID(orderID string) (int64, error) {
-	var chatID int64
-	timestamp := time.Now().Unix()
-	_, err := fmt.Sscanf(orderID, "order%d_%d", &chatID, timestamp)
-	if err != nil {
-		return 0, err
-	}
-	return chatID, nil
-}
 func updateUserStatus(chatID int64) *UserPaymentStatus {
 	if status, exists := userPaymentStatuses[chatID]; exists {
 		if isOrderExpired(status) {
@@ -288,9 +247,9 @@ func createOrderID(chatID int64, timestamp int64) string {
 	return fmt.Sprintf("order_%d_%d", chatID, timestamp)
 }
 
-func startHTTPServer(bot *tgbotapi.BotAPI, db *gorm.DB) {
+func startHTTPServer(db *gorm.DB) {
 	http.HandleFunc("/webhook", func(w http.ResponseWriter, r *http.Request) {
-		handleWebhook(bot, db, w, r)
+		handleWebhook(db, w, r)
 	})
 
 	http.HandleFunc("/create_payment", func(w http.ResponseWriter, r *http.Request) {

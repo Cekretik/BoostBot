@@ -408,11 +408,10 @@ func updateOrdersPeriodically(db *gorm.DB, done chan bool) {
 	}
 }
 
-func updatePaymentStatusInDB(db *gorm.DB, orderID, status string) error {
+func updatePaymentStatusInDB(db *gorm.DB, orderID, status string) bool {
 	var payment Payments
-	if err := db.Where("order_id = ?", orderID).First(&payment).Error; err != nil {
-		return err
+	if err := db.Model(&payment).Where("order_id = ?", orderID).Update("status", status).Error; err != nil {
+		return false
 	}
-	payment.Status = status
-	return db.Save(&payment).Error
+	return true
 }
