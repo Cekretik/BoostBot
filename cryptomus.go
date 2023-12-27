@@ -62,6 +62,8 @@ func generateSign(data map[string]string, apiKey string) string {
 	}
 
 	base64Data := base64.StdEncoding.EncodeToString(jsonData)
+	log.Printf("Cumi: %v", data)
+	log.Printf("Bumi key: %v", apiKey)
 	toHash := base64Data + apiKey
 
 	hasher := md5.New()
@@ -98,6 +100,7 @@ func CreatePayment(amount, currency, orderID string) (*CryptomusPaymentResponse,
 
 	client := &http.Client{}
 	log.Printf("Sending request to CryptoMus API")
+	log.Printf("Request: %v", req)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("Error sending request: %v", err)

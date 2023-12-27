@@ -118,7 +118,7 @@ func handlePaymentInput(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amountT
 }
 
 func createAndSendPaymentLink(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amount float64, orderID string, timestamp int64) {
-	paymentResponse, err := CreatePayment(fmt.Sprintf("%.4f", amount), "USD", fmt.Sprintf("order_%d_%d", chatID, timestamp))
+	paymentResponse, err := CreatePayment(fmt.Sprintf("%.4f", amount), "USD", orderID)
 	if err != nil {
 		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при создании платежа."))
 		return
@@ -145,6 +145,7 @@ func createAndSendPaymentLink(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, a
 
 func handleWebhook(db *gorm.DB, w http.ResponseWriter, r *http.Request) {
 	var webhookData CryptomusWebhookData
+	log.Printf("MISHKA GUMI BEAR: %v", r.Body)
 	err := json.NewDecoder(r.Body).Decode(&webhookData)
 	if err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
