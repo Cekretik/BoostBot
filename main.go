@@ -66,6 +66,9 @@ func main() {
 				handleCryptomusButton(bot, update.CallbackQuery.Message.Chat.ID)
 				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
 			}
+			if strings.HasPrefix(update.CallbackQuery.Data, "addFavorite:") || strings.HasPrefix(update.CallbackQuery.Data, "removeFavorite:") {
+				handleAddToFavoritesCallback(bot, db, update.CallbackQuery)
+			}
 			if strings.HasPrefix(callbackData, "subcategory:") || strings.HasPrefix(callbackData, "prevServ:") || strings.HasPrefix(callbackData, "nextServ:") {
 				var subcategoryID string
 				if strings.HasPrefix(callbackData, "subcategory:") {
@@ -80,7 +83,6 @@ func main() {
 					log.Printf("Error getting total pages for services: %v", err)
 					continue
 				}
-
 				HandleServiceCallBackQuery(bot, db, update.CallbackQuery, totalServicePages)
 			} else if strings.HasPrefix(callbackData, "serviceInfo:") {
 				HandleServiceCallBackQuery(bot, db, update.CallbackQuery, 0)
@@ -178,7 +180,9 @@ func main() {
 					continue
 				}
 			}
-
+			if update.Message.Text == "❤️Избранное" {
+				handleFavoritesCommand(bot, db, update.Message.Chat.ID)
+			}
 			if exists && userPaymentStatus.CurrentState == "awaitingAmount" {
 				handlePaymentInput(db, bot, chatID, update.Message.Text)
 				continue

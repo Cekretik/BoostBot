@@ -6,13 +6,13 @@ import (
 
 type UserState struct {
 	gorm.Model
-	UserID     int64   `gorm:"column:user_id" json:"user_id"`
-	UserName   string  `gorm:"column:user_name" json:"user_name"`
-	Subscribed bool    `gorm:"column:subscribed" json:"subscribed"`
-	ChannelID  int64   `gorm:"column:channel_id" json:"channel_id"`
-	Balance    float64 `gorm:"column:balance" json:"balance"`
+	UserID     int64      `gorm:"column:user_id" json:"user_id"`
+	UserName   string     `gorm:"column:user_name" json:"user_name"`
+	Subscribed bool       `gorm:"column:subscribed" json:"subscribed"`
+	ChannelID  int64      `gorm:"column:channel_id" json:"channel_id"`
+	Balance    float64    `gorm:"column:balance" json:"balance"`
+	Favorites  []Services `gorm:"many2many:user_favorites;"`
 }
-
 type Category struct {
 	gorm.Model
 	Name string `gorm:"column:name" json:"name"`
@@ -28,17 +28,18 @@ type Subcategory struct {
 
 type Services struct {
 	gorm.Model
-	ID         int     `gorm:"column:id" json:"id"`
-	Name       string  `gorm:"column:name" json:"name"`
-	CategoryID string  `gorm:"column:category_id" json:"categoryId"`
-	Min        int     `gorm:"column:min" json:"min"`
-	Max        int     `gorm:"column:max" json:"max"`
-	Dripfeed   bool    `gorm:"column:dripfeed" json:"dripfeed"`
-	Refill     bool    `gorm:"column:refill" json:"refill"`
-	Cancel     bool    `gorm:"column:cancel" json:"cancel"`
-	ServiceID  string  `gorm:"column:service_id" json:"serviceId"`
-	Rate       float64 `gorm:"column:rate" json:"rate"`
-	Type       string  `gorm:"column:type" json:"type"`
+	ID         int         `gorm:"column:id" json:"id"`
+	Name       string      `gorm:"column:name" json:"name"`
+	CategoryID string      `gorm:"column:category_id" json:"categoryId"`
+	Min        int         `gorm:"column:min" json:"min"`
+	Max        int         `gorm:"column:max" json:"max"`
+	Dripfeed   bool        `gorm:"column:dripfeed" json:"dripfeed"`
+	Refill     bool        `gorm:"column:refill" json:"refill"`
+	Cancel     bool        `gorm:"column:cancel" json:"cancel"`
+	ServiceID  string      `gorm:"column:service_id" json:"serviceId"`
+	Rate       float64     `gorm:"column:rate" json:"rate"`
+	Type       string      `gorm:"column:type" json:"type"`
+	Users      []UserState `gorm:"many2many:user_favorites;"`
 }
 
 // Struct for POST orders

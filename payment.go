@@ -137,12 +137,18 @@ func createAndSendPaymentLink(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, a
 	if paymentURL == "" {
 		bot.Send(tgbotapi.NewMessage(chatID, "Не удалось получить ссылку на платеж,попробуйте снова."))
 	} else {
-		bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Для пополнения на сумму $%.4f перейдите по ссылке: %s", amount, paymentURL)))
+		inlineKeyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonURL("Оплатить", paymentURL),
+			),
+		)
+		msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Для пополнения на сумму $%.4f нажмите на кнопку оплатить:", amount))
+		msg.ReplyMarkup = inlineKeyboard
+		bot.Send(msg)
 		delete(userPaymentStatuses, chatID)
 		sendStandardKeyboardAfterPayment(bot, chatID)
 	}
 }
-
 func handleWebhook(db *gorm.DB, w http.ResponseWriter, r *http.Request) {
 	var webhookData CryptomusWebhookData
 	log.Printf("MISHKA GUMI BEAR: %v", r.Body)

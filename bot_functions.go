@@ -19,10 +19,12 @@ func sendKeyboardAfterOrder(bot *tgbotapi.BotAPI, chatID int64) {
 	balanceButton := tgbotapi.NewKeyboardButton("💰Баланс")
 	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
 	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
+	makeFavoriteButton := tgbotapi.NewKeyboardButton("❤️Избранное")
 	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(balanceButton),
 		tgbotapi.NewKeyboardButtonRow(ordersButton),
 		tgbotapi.NewKeyboardButtonRow(makeOrderButton),
+		tgbotapi.NewKeyboardButtonRow(makeFavoriteButton),
 	)
 
 	msg.ReplyMarkup = quickReplyMarkup
@@ -34,10 +36,12 @@ func sendStandardKeyboard(bot *tgbotapi.BotAPI, chatID int64) {
 	balanceButton := tgbotapi.NewKeyboardButton("💰Баланс")
 	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
 	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
+	makeFavoriteButton := tgbotapi.NewKeyboardButton("❤️Избранное")
 	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(balanceButton),
 		tgbotapi.NewKeyboardButtonRow(ordersButton),
 		tgbotapi.NewKeyboardButtonRow(makeOrderButton),
+		tgbotapi.NewKeyboardButtonRow(makeFavoriteButton),
 	)
 
 	msg.ReplyMarkup = quickReplyMarkup
@@ -50,10 +54,12 @@ func sendStandardKeyboardAfterPayment(bot *tgbotapi.BotAPI, chatID int64) {
 	balanceButton := tgbotapi.NewKeyboardButton("💰Баланс")
 	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
 	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
+	makeFavoriteButton := tgbotapi.NewKeyboardButton("❤️Избранное")
 	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(balanceButton),
 		tgbotapi.NewKeyboardButtonRow(ordersButton),
 		tgbotapi.NewKeyboardButtonRow(makeOrderButton),
+		tgbotapi.NewKeyboardButtonRow(makeFavoriteButton),
 	)
 
 	msg.ReplyMarkup = quickReplyMarkup
@@ -65,10 +71,12 @@ func WelcomeMessage(bot *tgbotapi.BotAPI, chatID int64) {
 	balanceButton := tgbotapi.NewKeyboardButton("💰Баланс")
 	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
 	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
+	makeFavoriteButton := tgbotapi.NewKeyboardButton("❤️Избранное")
 	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(balanceButton),
 		tgbotapi.NewKeyboardButtonRow(ordersButton),
 		tgbotapi.NewKeyboardButtonRow(makeOrderButton),
+		tgbotapi.NewKeyboardButtonRow(makeFavoriteButton),
 	)
 
 	msg.ReplyMarkup = quickReplyMarkup
@@ -334,4 +342,23 @@ func translateOrderStatus(status string) string {
 	default:
 		return "Неизвестный статус"
 	}
+}
+
+func handleFavoritesCommand(bot *tgbotapi.BotAPI, db *gorm.DB, chatID int64) {
+	favorites, err := GetUserFavorites(db, chatID)
+	if err != nil || len(favorites) == 0 {
+		bot.Send(tgbotapi.NewMessage(chatID, "В избранном пока нет услуг."))
+		return
+	}
+
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for _, service := range favorites {
+		button := tgbotapi.NewInlineKeyboardButtonData(service.Name, "serviceInfo:"+strconv.Itoa(service.ID))
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(button))
+	}
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	msg := tgbotapi.NewMessage(chatID, "Ваши избранные услуги:")
+	msg.ReplyMarkup = keyboard
+	bot.Send(msg)
 }

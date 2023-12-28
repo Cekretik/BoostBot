@@ -415,3 +415,51 @@ func updatePaymentStatusInDB(db *gorm.DB, orderID, status string) bool {
 	}
 	return true
 }
+
+func CheckIfFavorite(db *gorm.DB, userID int64, ID int) (bool, error) {
+	var count int64
+	err := db.Table("user_favorites").
+		Where("user_state_id = ? AND services_id = ?", userID, ID).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func AddServiceToFavorites(db *gorm.DB, userID int64, serviceID int) error {
+	var user UserState
+	if err := db.Where("user_id = ?", userID).First(&user).Error; err != nil {
+		log.Printf("User not found with userID %d: %v", userID, err)
+		return err
+	}
+
+	var service Services
+	if err := db.Where("id = ?", serviceID).First(&service).Error; err != nil {
+		log.Printf("Service not found with serviceID %d: %v", serviceID, err)
+		return err
+	}
+
+	return db.Model(&user).Association("Favorites").Append(&service)
+}
+
+func GetUserFavorites(db *gorm.DB, userID int64) ([]Services, error) {
+	var user UserState
+	if err := db.Preload("Favorites").Where("user_id = ?", userID).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return user.Favorites, nil
+}
+
+func RemoveServiceFromFavorites(db *gorm.DB, userID int64, serviceID int) error {
+	var user UserState
+	var service Services
+	if err := db.Where("user_id = ?", userID).First(&user).Error; err != nil {
+		return err
+	}
+	if err := db.Where("id = ?", service.ID).First(&service).Error; err != nil {
+		return err
+	}
+
+	return db.Model(&user).Association("Favorites").Delete(&service)
+}

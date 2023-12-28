@@ -113,35 +113,52 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 		bot.Send(editMsg)
 
 	} else if strings.HasPrefix(callbackQuery.Data, "serviceInfo:") {
-		serviceID := strings.TrimPrefix(callbackQuery.Data, "serviceInfo:")
+		serviceIDStr := strings.TrimPrefix(callbackQuery.Data, "serviceInfo:")
+		var service Services
+		userID := callbackQuery.Message.Chat.ID
 		deleteMsg := tgbotapi.NewDeleteMessage(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID)
 		bot.Send(deleteMsg)
 
-		service, err := GetServiceByID(db, serviceID)
+		service, err := GetServiceByID(db, serviceIDStr)
 		if err != nil {
-			log.Printf("Error getting service '%s': %v", serviceID, err)
+			log.Printf("Error getting service '%s': %v", service.Name, err)
 			return
 		}
+
 		subcategory, err := GetSubcategoryByID(db, service.CategoryID)
 		if err != nil {
 			log.Printf("Error getting subcategory '%s': %v", subcategory.Name, err)
 			return
 		}
 
-		msgText := FormatServiceInfo(service, subcategory)
-		msg := tgbotapi.NewMessage(callbackQuery.Message.Chat.ID, msgText)
+		isFavorite, err := CheckIfFavorite(db, userID, service.ID)
+		if err != nil {
+			log.Printf("Error checking if service '%s' is favorite: %v", service.Name, err)
+			return
+		}
 
+		// Создаем текст для кнопки в зависимости от того, находится ли услуга в избранных
+		favoriteButtonText := "Добавить в избранное"
+		favoriteCallbackData := fmt.Sprintf("addFavorite:%d", service.ID)
+		if isFavorite {
+			favoriteButtonText = "Удалить из избранного"
+			favoriteCallbackData = fmt.Sprintf("removeFavorite:%d", service.ID)
+		}
+
+		msgText := FormatServiceInfo(service, subcategory)
 		backData := "backToServices:" + service.CategoryID
 		keyboard := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData("🔙Вернуться к услугам", backData),
+				tgbotapi.NewInlineKeyboardButtonData(favoriteButtonText, favoriteCallbackData),
 			),
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData("➕Заказать", "order:"+strconv.Itoa(service.ID)),
 			),
 		)
-		msg.ReplyMarkup = keyboard
 
+		msg := tgbotapi.NewMessage(callbackQuery.Message.Chat.ID, msgText)
+		msg.ReplyMarkup = keyboard
 		bot.Send(msg)
 
 	} else if strings.HasPrefix(callbackQuery.Data, "order:") {
@@ -284,4 +301,39 @@ func createServicePaginationRow(subcategoryID string, currentPage int, totalServ
 	}
 
 	return paginationRow
+}
+
+func handleAddToFavoritesCallback(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery *tgbotapi.CallbackQuery) {
+	parts := strings.Split(callbackQuery.Data, ":")
+	var service Services
+	action := parts[0]
+	serviceID := parts[1]
+	serviceIDInt, err := strconv.Atoi(serviceID)
+	if err != nil {
+		bot.AnswerCallbackQuery(tgbotapi.NewCallback(callbackQuery.ID, "Ошибка при обновлении избранных услуг"))
+		return
+	}
+
+	err = db.First(&service, "id = ?", serviceIDInt).Error
+	if err != nil {
+		bot.AnswerCallbackQuery(tgbotapi.NewCallback(callbackQuery.ID, "Ошибка при обновлении избранных услуг"))
+		return
+	}
+	userID := callbackQuery.Message.Chat.ID
+
+	var responseText string
+	if action == "addFavorite" {
+		err = AddServiceToFavorites(db, userID, int(service.ID))
+		responseText = "Услуга добавлена в избранное"
+	} else if action == "removeFavorite" {
+		err = RemoveServiceFromFavorites(db, userID, int(service.ID))
+		responseText = "Услуга удалена из избранного"
+	}
+
+	if err != nil {
+		bot.AnswerCallbackQuery(tgbotapi.NewCallback(callbackQuery.ID, "Ошибка при обновлении избранных услуг"))
+		return
+	}
+
+	bot.AnswerCallbackQuery(tgbotapi.NewCallback(callbackQuery.ID, responseText))
 }
