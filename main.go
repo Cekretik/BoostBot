@@ -57,6 +57,7 @@ func main() {
 
 	for update := range updates {
 		if update.CallbackQuery != nil {
+
 			callbackData := update.CallbackQuery.Data
 			switch callbackData {
 			case "replenishBalance":
@@ -164,7 +165,6 @@ func main() {
 			}
 		}
 
-		// Обработка обычных сообщений
 		if update.Message != nil {
 			chatID := update.Message.Chat.ID
 			userPaymentStatus, exists := userPaymentStatuses[chatID]
@@ -179,9 +179,6 @@ func main() {
 					sendStandardKeyboard(bot, chatID)
 					continue
 				}
-			}
-			if update.Message.Text == "❤️Избранное" {
-				handleFavoritesCommand(bot, db, update.Message.Chat.ID)
 			}
 			if exists && userPaymentStatus.CurrentState == "awaitingAmount" {
 				handlePaymentInput(db, bot, chatID, update.Message.Text)
@@ -219,6 +216,8 @@ func main() {
 						handleBalanceCommand(bot, update.Message.Chat.ID, db)
 					} else if update.Message.Text == "📝Мои заказы" {
 						handleOrdersCommand(bot, update.Message.Chat.ID, db)
+					} else if update.Message.Text == "❤️Избранное" {
+						handleFavoritesCommand(bot, db, update.Message.Chat.ID)
 					} else {
 						WelcomeMessage(bot, update.Message.Chat.ID)
 						SendPromotionMessage(bot, update.Message.Chat.ID, db)

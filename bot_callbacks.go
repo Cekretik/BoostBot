@@ -326,10 +326,10 @@ func handleAddToFavoritesCallback(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQue
 
 	var responseText string
 	if action == "addFavorite" {
-		err = AddServiceToFavorites(db, userID, service.ID) // Используйте здесь service.ID
+		err = AddServiceToFavorites(db, userID, service.ID)
 		responseText = "Услуга добавлена в избранное"
 	} else if action == "removeFavorite" {
-		err = RemoveServiceFromFavorites(db, userID, service.ID) // Используйте здесь service.ID
+		err = RemoveServiceFromFavorites(db, userID, service.ID)
 		responseText = "Услуга удалена из избранного"
 	}
 
