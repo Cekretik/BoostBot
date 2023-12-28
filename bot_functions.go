@@ -353,7 +353,7 @@ func handleFavoritesCommand(bot *tgbotapi.BotAPI, db *gorm.DB, chatID int64) {
 
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, service := range favorites {
-		button := tgbotapi.NewInlineKeyboardButtonData(service.Name, "serviceInfo:"+strconv.Itoa(service.ID))
+		button := tgbotapi.NewInlineKeyboardButtonData(service.Name, "serviceInfo:"+service.ServiceID)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(button))
 	}
 

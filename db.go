@@ -418,8 +418,9 @@ func updatePaymentStatusInDB(db *gorm.DB, orderID, status string) bool {
 
 func CheckIfFavorite(db *gorm.DB, userID int64, ID int) (bool, error) {
 	var count int64
+	var service Services
 	err := db.Table("user_favorites").
-		Where("user_state_id = ? AND services_id = ?", userID, ID).
+		Where("user_state_id = ? AND services_id = ?", userID, service.ID).
 		Count(&count).Error
 	if err != nil {
 		return false, err
@@ -433,10 +434,10 @@ func AddServiceToFavorites(db *gorm.DB, userID int64, serviceID int) error {
 		log.Printf("User not found with userID %d: %v", userID, err)
 		return err
 	}
-
+	log.Printf("skvazizambza %v", serviceID)
 	var service Services
 	if err := db.Where("id = ?", serviceID).First(&service).Error; err != nil {
-		log.Printf("Service not found with serviceID %d: %v", serviceID, err)
+		log.Printf("Service not found with serviceID %d: %v", service.ID, err)
 		return err
 	}
 
@@ -457,7 +458,7 @@ func RemoveServiceFromFavorites(db *gorm.DB, userID int64, serviceID int) error 
 	if err := db.Where("user_id = ?", userID).First(&user).Error; err != nil {
 		return err
 	}
-	if err := db.Where("id = ?", service.ID).First(&service).Error; err != nil {
+	if err := db.Where("id = ?", serviceID).First(&service).Error; err != nil {
 		return err
 	}
 

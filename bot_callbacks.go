@@ -305,28 +305,31 @@ func createServicePaginationRow(subcategoryID string, currentPage int, totalServ
 
 func handleAddToFavoritesCallback(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery *tgbotapi.CallbackQuery) {
 	parts := strings.Split(callbackQuery.Data, ":")
-	var service Services
 	action := parts[0]
-	serviceID := parts[1]
-	serviceIDInt, err := strconv.Atoi(serviceID)
+	serviceIDStr := parts[1]
+
+	// Преобразование строки ID в int
+	serviceID, err := strconv.ParseInt(serviceIDStr, 10, 64)
 	if err != nil {
-		bot.AnswerCallbackQuery(tgbotapi.NewCallback(callbackQuery.ID, "Ошибка при обновлении избранных услуг"))
+		bot.AnswerCallbackQuery(tgbotapi.NewCallback(callbackQuery.ID, "Ошибка: неверный идентификатор услуги"))
 		return
 	}
 
-	err = db.First(&service, "id = ?", serviceIDInt).Error
-	if err != nil {
-		bot.AnswerCallbackQuery(tgbotapi.NewCallback(callbackQuery.ID, "Ошибка при обновлении избранных услуг"))
+	userID := callbackQuery.Message.Chat.ID
+
+	// Получение объекта услуги из базы данных
+	var service Services
+	if err := db.First(&service, serviceID).Error; err != nil {
+		bot.AnswerCallbackQuery(tgbotapi.NewCallback(callbackQuery.ID, "Услуга не найдена"))
 		return
 	}
-	userID := callbackQuery.Message.Chat.ID
 
 	var responseText string
 	if action == "addFavorite" {
-		err = AddServiceToFavorites(db, userID, int(service.ID))
+		err = AddServiceToFavorites(db, userID, service.ID) // Используйте здесь service.ID
 		responseText = "Услуга добавлена в избранное"
 	} else if action == "removeFavorite" {
-		err = RemoveServiceFromFavorites(db, userID, int(service.ID))
+		err = RemoveServiceFromFavorites(db, userID, service.ID) // Используйте здесь service.ID
 		responseText = "Услуга удалена из избранного"
 	}
 
