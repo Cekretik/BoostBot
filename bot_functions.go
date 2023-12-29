@@ -20,11 +20,12 @@ func sendKeyboardAfterOrder(bot *tgbotapi.BotAPI, chatID int64) {
 	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
 	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
 	makeFavoriteButton := tgbotapi.NewKeyboardButton("❤️Избранное")
+	makeTechSupButton := tgbotapi.NewKeyboardButton("📞Тех.поддержка")
+
 	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(balanceButton),
-		tgbotapi.NewKeyboardButtonRow(ordersButton),
-		tgbotapi.NewKeyboardButtonRow(makeOrderButton),
-		tgbotapi.NewKeyboardButtonRow(makeFavoriteButton),
+		tgbotapi.NewKeyboardButtonRow(balanceButton, ordersButton),
+		tgbotapi.NewKeyboardButtonRow(makeOrderButton, makeFavoriteButton),
+		tgbotapi.NewKeyboardButtonRow(makeTechSupButton),
 	)
 
 	msg.ReplyMarkup = quickReplyMarkup
@@ -37,11 +38,12 @@ func sendStandardKeyboard(bot *tgbotapi.BotAPI, chatID int64) {
 	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
 	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
 	makeFavoriteButton := tgbotapi.NewKeyboardButton("❤️Избранное")
+	makeTechSupButton := tgbotapi.NewKeyboardButton("📞Тех.поддержка")
+
 	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(balanceButton),
-		tgbotapi.NewKeyboardButtonRow(ordersButton),
-		tgbotapi.NewKeyboardButtonRow(makeOrderButton),
-		tgbotapi.NewKeyboardButtonRow(makeFavoriteButton),
+		tgbotapi.NewKeyboardButtonRow(balanceButton, ordersButton),
+		tgbotapi.NewKeyboardButtonRow(makeOrderButton, makeFavoriteButton),
+		tgbotapi.NewKeyboardButtonRow(makeTechSupButton),
 	)
 
 	msg.ReplyMarkup = quickReplyMarkup
@@ -55,11 +57,12 @@ func sendStandardKeyboardAfterPayment(bot *tgbotapi.BotAPI, chatID int64) {
 	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
 	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
 	makeFavoriteButton := tgbotapi.NewKeyboardButton("❤️Избранное")
+	makeTechSupButton := tgbotapi.NewKeyboardButton("📞Тех.поддержка")
+
 	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(balanceButton),
-		tgbotapi.NewKeyboardButtonRow(ordersButton),
-		tgbotapi.NewKeyboardButtonRow(makeOrderButton),
-		tgbotapi.NewKeyboardButtonRow(makeFavoriteButton),
+		tgbotapi.NewKeyboardButtonRow(balanceButton, ordersButton),
+		tgbotapi.NewKeyboardButtonRow(makeOrderButton, makeFavoriteButton),
+		tgbotapi.NewKeyboardButtonRow(makeTechSupButton),
 	)
 
 	msg.ReplyMarkup = quickReplyMarkup
@@ -72,14 +75,30 @@ func WelcomeMessage(bot *tgbotapi.BotAPI, chatID int64) {
 	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
 	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
 	makeFavoriteButton := tgbotapi.NewKeyboardButton("❤️Избранное")
+	makeTechSupButton := tgbotapi.NewKeyboardButton("📞Тех.поддержка")
+
 	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(balanceButton),
-		tgbotapi.NewKeyboardButtonRow(ordersButton),
-		tgbotapi.NewKeyboardButtonRow(makeOrderButton),
-		tgbotapi.NewKeyboardButtonRow(makeFavoriteButton),
+		tgbotapi.NewKeyboardButtonRow(balanceButton, ordersButton),
+		tgbotapi.NewKeyboardButtonRow(makeOrderButton, makeFavoriteButton),
+		tgbotapi.NewKeyboardButtonRow(makeTechSupButton),
 	)
 
 	msg.ReplyMarkup = quickReplyMarkup
+	bot.Send(msg)
+}
+
+func techSupMessage(bot *tgbotapi.BotAPI, chatID int64) {
+	channelLink := "https://t.me/DARRINAN00"
+	messageText := "Техническая поддержка: "
+	msg := tgbotapi.NewMessage(chatID, messageText)
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonURL("Написать", channelLink),
+		),
+	)
+	msg.ReplyMarkup = keyboard
+
 	bot.Send(msg)
 }
 

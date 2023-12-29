@@ -218,6 +218,8 @@ func main() {
 						handleOrdersCommand(bot, update.Message.Chat.ID, db)
 					} else if update.Message.Text == "❤️Избранное" {
 						handleFavoritesCommand(bot, db, update.Message.Chat.ID)
+					} else if update.Message.Text == "📞Тех.поддержка" {
+						techSupMessage(bot, update.Message.Chat.ID)
 					} else {
 						WelcomeMessage(bot, update.Message.Chat.ID)
 						SendPromotionMessage(bot, update.Message.Chat.ID, db)
