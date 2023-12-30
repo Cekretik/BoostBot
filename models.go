@@ -102,3 +102,10 @@ type Payments struct {
 	Status  string  `gorm:"column:status" json:"status"`
 	Type    string  `gorm:"column:type" json:"type"`
 }
+
+type Referral struct {
+	gorm.Model
+	ReferrerID   int64   `gorm:"column:referrer_id"`
+	ReferredID   int64   `gorm:"column:referred_id"`
+	AmountEarned float64 `gorm:"column:amount_earned"`
+}

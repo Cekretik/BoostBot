@@ -209,7 +209,17 @@ func UpdateUserBalance(db *gorm.DB, userID int64, amount float64) error {
 	}
 
 	user.Balance += amount
-	return db.Save(&user).Error
+	if err := db.Save(&user).Error; err != nil {
+		return err
+	}
+
+	var referral Referral
+	if err := db.Where("referred_id = ?", userID).First(&referral).Error; err == nil {
+		commission := amount * 0.10 // 10% комиссии
+		db.Model(&UserState{}).Where("user_id = ?", referral.ReferrerID).Update("balance", gorm.Expr("balance + ?", commission))
+		db.Model(&Referral{}).Where("id = ?", referral.ID).Update("amount_earned", gorm.Expr("amount_earned + ?", commission))
+	}
+	return nil
 }
 
 func isOrderExpired(userStatus *UserPaymentStatus) bool {

@@ -21,13 +21,12 @@ func sendKeyboardAfterOrder(bot *tgbotapi.BotAPI, chatID int64) {
 	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
 	makeFavoriteButton := tgbotapi.NewKeyboardButton("❤️Избранное")
 	makeTechSupButton := tgbotapi.NewKeyboardButton("📞Тех.поддержка")
-
+	makeReferralpButton := tgbotapi.NewKeyboardButton("👤 Реферальная система")
 	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(balanceButton, ordersButton),
 		tgbotapi.NewKeyboardButtonRow(makeOrderButton, makeFavoriteButton),
-		tgbotapi.NewKeyboardButtonRow(makeTechSupButton),
+		tgbotapi.NewKeyboardButtonRow(makeTechSupButton, makeReferralpButton),
 	)
-
 	msg.ReplyMarkup = quickReplyMarkup
 	bot.Send(msg)
 }
@@ -39,11 +38,11 @@ func sendStandardKeyboard(bot *tgbotapi.BotAPI, chatID int64) {
 	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
 	makeFavoriteButton := tgbotapi.NewKeyboardButton("❤️Избранное")
 	makeTechSupButton := tgbotapi.NewKeyboardButton("📞Тех.поддержка")
-
+	makeReferralpButton := tgbotapi.NewKeyboardButton("👤 Реферальная система")
 	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(balanceButton, ordersButton),
 		tgbotapi.NewKeyboardButtonRow(makeOrderButton, makeFavoriteButton),
-		tgbotapi.NewKeyboardButtonRow(makeTechSupButton),
+		tgbotapi.NewKeyboardButtonRow(makeTechSupButton, makeReferralpButton),
 	)
 
 	msg.ReplyMarkup = quickReplyMarkup
@@ -58,13 +57,12 @@ func sendStandardKeyboardAfterPayment(bot *tgbotapi.BotAPI, chatID int64) {
 	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
 	makeFavoriteButton := tgbotapi.NewKeyboardButton("❤️Избранное")
 	makeTechSupButton := tgbotapi.NewKeyboardButton("📞Тех.поддержка")
-
+	makeReferralpButton := tgbotapi.NewKeyboardButton("👤 Реферальная система")
 	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(balanceButton, ordersButton),
 		tgbotapi.NewKeyboardButtonRow(makeOrderButton, makeFavoriteButton),
-		tgbotapi.NewKeyboardButtonRow(makeTechSupButton),
+		tgbotapi.NewKeyboardButtonRow(makeTechSupButton, makeReferralpButton),
 	)
-
 	msg.ReplyMarkup = quickReplyMarkup
 	bot.Send(msg)
 }
@@ -76,13 +74,12 @@ func WelcomeMessage(bot *tgbotapi.BotAPI, chatID int64) {
 	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
 	makeFavoriteButton := tgbotapi.NewKeyboardButton("❤️Избранное")
 	makeTechSupButton := tgbotapi.NewKeyboardButton("📞Тех.поддержка")
-
+	makeReferralpButton := tgbotapi.NewKeyboardButton("👤 Реферальная система")
 	quickReplyMarkup := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(balanceButton, ordersButton),
 		tgbotapi.NewKeyboardButtonRow(makeOrderButton, makeFavoriteButton),
-		tgbotapi.NewKeyboardButtonRow(makeTechSupButton),
+		tgbotapi.NewKeyboardButtonRow(makeTechSupButton, makeReferralpButton),
 	)
-
 	msg.ReplyMarkup = quickReplyMarkup
 	bot.Send(msg)
 }
@@ -379,5 +376,31 @@ func handleFavoritesCommand(bot *tgbotapi.BotAPI, db *gorm.DB, chatID int64) {
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
 	msg := tgbotapi.NewMessage(chatID, "Ваши избранные услуги:")
 	msg.ReplyMarkup = keyboard
+	bot.Send(msg)
+}
+
+func GenerateReferralLink(chatID int64) string {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	botLink := os.Getenv("BOT_LINK")
+	return fmt.Sprintf(botLink+"?start=%d", chatID)
+}
+
+func ShowReferralStats(bot *tgbotapi.BotAPI, db *gorm.DB, userID int64) {
+	var referrals []Referral
+	db.Where("referrer_id = ?", userID).Find(&referrals)
+	count := len(referrals)
+
+	var totalEarned float64
+	for _, referral := range referrals {
+		totalEarned += referral.AmountEarned
+	}
+
+	msgText := fmt.Sprintf("Приглашено человек: %d\nПолучено с ваших рефералов: $%.2f\nВаша партнёрская ссылка: %s",
+		count, totalEarned, GenerateReferralLink(userID))
+
+	msg := tgbotapi.NewMessage(userID, msgText)
 	bot.Send(msg)
 }

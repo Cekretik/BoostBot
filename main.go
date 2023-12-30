@@ -168,7 +168,6 @@ func main() {
 		if update.Message != nil {
 			chatID := update.Message.Chat.ID
 			userPaymentStatus, exists := userPaymentStatuses[chatID]
-			// Обработка команды "Отмена"
 			if update.Message.Text == "Отмена" {
 				if _, exists := userStatuses[chatID]; exists {
 					delete(userStatuses, chatID)
@@ -183,6 +182,31 @@ func main() {
 			if exists && userPaymentStatus.CurrentState == "awaitingAmount" {
 				handlePaymentInput(db, bot, chatID, update.Message.Text)
 				continue
+			}
+			if strings.HasPrefix(update.Message.Text, "/start") {
+				referrerIDStr := strings.TrimPrefix(update.Message.Text, "/start ")
+				referrerID, err := strconv.ParseInt(referrerIDStr, 10, 64)
+
+				if err == nil && referrerID != 0 {
+					// Проверяем, существует ли пользователь-реферер
+					var referrer UserState
+					if err := db.Where("user_id = ?", referrerID).First(&referrer).Error; err == nil {
+						// Проверяем, что реферер и реферал - разные люди
+						if referrer.UserID != int64(update.Message.From.ID) {
+							// Создаем запись о реферале, если она еще не существует
+							var existingReferral Referral
+							if err := db.Where("referrer_id = ? AND referred_id = ?", referrerID, update.Message.From.ID).First(&existingReferral).Error; err != nil {
+								// Добавляем нового реферала
+								newReferral := Referral{
+									ReferrerID:   referrerID,
+									ReferredID:   int64(update.Message.From.ID),
+									AmountEarned: 0,
+								}
+								db.Create(&newReferral)
+							}
+						}
+					}
+				}
 			}
 			if userStatus, exists := userStatuses[chatID]; exists && userStatus.CurrentState != "" {
 				serviceID, err := strconv.Atoi(userStatus.PendingServiceID)
@@ -220,6 +244,8 @@ func main() {
 						handleFavoritesCommand(bot, db, update.Message.Chat.ID)
 					} else if update.Message.Text == "📞Тех.поддержка" {
 						techSupMessage(bot, update.Message.Chat.ID)
+					} else if update.Message.Text == "👤 Реферальная система" {
+						ShowReferralStats(bot, db, update.Message.Chat.ID)
 					} else {
 						WelcomeMessage(bot, update.Message.Chat.ID)
 						SendPromotionMessage(bot, update.Message.Chat.ID, db)
