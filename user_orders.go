@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -77,7 +78,12 @@ func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 			return
 		}
 		userStatus.Quantity = quantity
+		increasePercent, err := strconv.ParseFloat(os.Getenv("PRICE_PERCENT"), 64)
+		if err != nil {
+			increasePercent = 0
+		}
 		cost := (float64(quantity) / 1000.0) * service.Rate
+		cost += cost * (increasePercent / 100.0)
 		// Получение баланса пользователя
 		var user UserState
 		if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {

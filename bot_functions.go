@@ -282,16 +282,18 @@ func CreateServiceKeyboard(db *gorm.DB, subcategoryID, currentPage, totalService
 	return tgbotapi.NewInlineKeyboardMarkup(rows...), nil
 }
 
-func FormatServiceInfo(service Services, subcategory Subcategory) string {
+func FormatServiceInfo(service Services, subcategory Subcategory, increasePercent float64) string {
+	increasedRate := service.Rate + service.Rate*(increasePercent/100)
+
 	return fmt.Sprintf(
 		"ℹ️ Информация об услуге\n\n"+
 			"🔢 ID услуги: %d\n"+
-			"📝 Услга: %s\n\n"+
-			"📝Категория:%s\n\n"+
+			"📝 Услуга: %s\n\n"+
+			"📝 Категория: %s\n\n"+
 			"💸 Цена за 1000: $%.*f\n\n"+
 			"📉 Минимальное количество: %d\n"+
 			"📈 Максимальное количество: %d",
-		service.ID, service.Name, subcategory.Name, decimalPlaces, service.Rate, service.Min, service.Max)
+		service.ID, service.Name, subcategory.Name, decimalPlaces, increasedRate, service.Min, service.Max)
 }
 
 // Функция для обработки нажатия кнопки "Баланс"

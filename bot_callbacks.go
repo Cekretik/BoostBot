@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 
@@ -144,8 +145,11 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 			favoriteButtonText = "Удалить из избранного"
 			favoriteCallbackData = fmt.Sprintf("removeFavorite:%d", service.ID)
 		}
-
-		msgText := FormatServiceInfo(service, subcategory)
+		increasePercent, err := strconv.ParseFloat(os.Getenv("PRICE_PERCENT"), 64)
+		if err != nil {
+			increasePercent = 0 // или установите значение по умолчанию
+		}
+		msgText := FormatServiceInfo(service, subcategory, increasePercent)
 		backData := "backToServices:" + service.CategoryID
 		keyboard := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
