@@ -408,12 +408,12 @@ func updateOrdersPeriodically(db *gorm.DB, done chan bool) {
 	}
 }
 
-func updatePaymentStatusInDB(db *gorm.DB, orderID, status string) bool {
+func updatePaymentStatusInDB(db *gorm.DB, orderID, status string) error {
 	var payment Payments
 	if err := db.Model(&payment).Where("order_id = ?", orderID).Update("status", status).Error; err != nil {
-		return false
+		return err
 	}
-	return true
+	return nil
 }
 
 func CheckIfFavorite(db *gorm.DB, userID int64, ID int) (bool, error) {

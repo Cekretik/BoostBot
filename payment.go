@@ -64,6 +64,9 @@ func handleReplenishCommand(bot *tgbotapi.BotAPI, chatID int64) {
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("Cryptomus", "cryptomus"),
 		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Payok", "Payok"),
+		),
 	)
 	cancelKeyboard := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
@@ -91,6 +94,22 @@ func handleCryptomusButton(bot *tgbotapi.BotAPI, chatID int64) {
 	bot.Send(msg)
 }
 
+func handlePayOKButton(bot *tgbotapi.BotAPI, chatID int64) {
+	userPaymentStatus := updateUserStatus(chatID)
+	userPaymentStatus.CurrentState = "awaitingAmountPayOK"
+	paymentID := createPaymentID(chatID, time.Now().Unix())
+	userPaymentStatus.OrderID = paymentID
+	msgText := "Введите желаемую сумму в долларах."
+	cancelKeyboard := tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("Отмена"),
+		),
+	)
+	msg := tgbotapi.NewMessage(chatID, msgText)
+	msg.ReplyMarkup = cancelKeyboard
+	bot.Send(msg)
+	userPaymentStatuses[chatID] = userPaymentStatus
+}
 func handlePaymentInput(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amountText string) {
 	userPaymentStatus := updateUserStatus(chatID)
 	if userPaymentStatus.CurrentState == "awaitingAmount" {
@@ -114,6 +133,33 @@ func handlePaymentInput(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amountT
 
 		userPaymentStatuses[chatID] = userPaymentStatus
 		createAndSendPaymentLink(db, bot, chatID, amount, userPaymentStatus.OrderID, time.Now().Unix())
+	}
+}
+
+func handlePaymentInputPayOK(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amountText string) {
+	userPaymentStatus := updateUserStatus(chatID)
+	if userPaymentStatus.CurrentState == "awaitingAmountPayOK" {
+		amount, err := strconv.ParseFloat(amountText, 64)
+		if err != nil || amount <= 0 {
+			msg := tgbotapi.NewMessage(chatID, "Введите корректную сумму в долларах.")
+			userPaymentStatuses[chatID] = userPaymentStatus
+			cancelKeyboard := tgbotapi.NewReplyKeyboard(
+				tgbotapi.NewKeyboardButtonRow(
+					tgbotapi.NewKeyboardButton("Отмена"),
+				),
+			)
+			msg.ReplyMarkup = cancelKeyboard
+			bot.Send(msg)
+			return
+		}
+
+		userPaymentStatus.ReplenishAmount = amount
+		if isOrderExpired(userPaymentStatus) {
+			userPaymentStatus.OrderID = createPaymentID(chatID, time.Now().Unix())
+		}
+
+		userPaymentStatuses[chatID] = userPaymentStatus
+		createAndSendPaymentLinkPayOK(db, bot, chatID, amount, userPaymentStatus.OrderID, time.Now().Unix())
 	}
 }
 
@@ -143,6 +189,40 @@ func createAndSendPaymentLink(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, a
 			),
 		)
 		msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Для пополнения на сумму $%.4f нажмите на кнопку оплатить:", amount))
+		msg.ReplyMarkup = inlineKeyboard
+		bot.Send(msg)
+		delete(userPaymentStatuses, chatID)
+		sendStandardKeyboardAfterPayment(bot, chatID)
+	}
+}
+func createAndSendPaymentLinkPayOK(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amount float64, paymentID string, timestamp int64) {
+	paymentURL, err := CreatePayOKPayment(fmt.Sprintf("%.2f", amount), paymentID, "USD", "Описание платежа")
+	if err != nil {
+		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при создании платежа."))
+		return
+	}
+
+	// Создание записи о платеже в БД
+	newPayment := Payments{
+		ChatID:  int(chatID),
+		OrderID: paymentID,
+		Amount:  amount,
+		Url:     paymentURL,
+		Status:  "pending",
+		Type:    "payok",
+	}
+	db.Create(&newPayment)
+
+	// Проверка наличия URL для платежа
+	if paymentURL == "" {
+		bot.Send(tgbotapi.NewMessage(chatID, "Не удалось получить ссылку на платеж, попробуйте снова."))
+	} else {
+		inlineKeyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonURL("Оплатить", paymentURL),
+			),
+		)
+		msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Для пополнения на сумму $%.2f нажмите на кнопку оплатить:", amount))
 		msg.ReplyMarkup = inlineKeyboard
 		bot.Send(msg)
 		delete(userPaymentStatuses, chatID)
@@ -259,18 +339,67 @@ func handleCreatePayment(w http.ResponseWriter, r *http.Request, db *gorm.DB) {
 	}
 	json.NewEncoder(w).Encode(response)
 }
+func handleCreatePaymentPayOK(w http.ResponseWriter, r *http.Request, db *gorm.DB) {
+	var req CreatePaymentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Генерация уникального paymentID для платежа
+	paymentID := createPaymentID(req.ChatID, time.Now().Unix())
+
+	// Создание платежа через PayOK
+	amountFormatted := fmt.Sprintf("%.2f", req.Amount)
+	paymentURL, err := CreatePayOKPayment(amountFormatted, paymentID, req.Currency, "Описание платежа")
+	if err != nil {
+		http.Error(w, "Failed to create payment", http.StatusInternalServerError)
+		return
+	}
+
+	// Сохранение информации о платеже в БД
+	newPayment := Payments{
+		ChatID:  int(req.ChatID),
+		OrderID: paymentID, // Здесь используется paymentID от PayOK
+		Amount:  req.Amount,
+		Url:     paymentURL,
+		Status:  "pending",
+		Type:    "payok",
+	}
+	db.Create(&newPayment)
+	log.Printf("Payment created: %+v", newPayment)
+	// Отправка ответа с URL платежа
+	response := map[string]string{
+		"url":    paymentURL,
+		"status": "success",
+	}
+	json.NewEncoder(w).Encode(response)
+}
 
 func createOrderID(chatID int64, timestamp int64) string {
 	return fmt.Sprintf("order_%d_%d", chatID, timestamp)
 }
 
+func createPaymentID(chatID int64, timestamp int64) string {
+	return fmt.Sprintf("payment_%d_%d", chatID, timestamp)
+}
 func startHTTPServer(db *gorm.DB) {
+	// Существующие обработчики
 	http.HandleFunc("/webhook", func(w http.ResponseWriter, r *http.Request) {
 		handleWebhook(db, w, r)
 	})
-
 	http.HandleFunc("/create_payment", func(w http.ResponseWriter, r *http.Request) {
 		handleCreatePayment(w, r, db)
+	})
+
+	// Добавление нового обработчика для создания платежа через PayOK
+	http.HandleFunc("/create_payment_payok", func(w http.ResponseWriter, r *http.Request) {
+		handleCreatePaymentPayOK(w, r, db)
+	})
+
+	// Добавление нового обработчика для уведомлений от PayOK
+	http.HandleFunc("/payok_notification", func(w http.ResponseWriter, r *http.Request) {
+		handlePayOKNotification(db, w, r)
 	})
 
 	log.Println("HTTP server started on :8080")

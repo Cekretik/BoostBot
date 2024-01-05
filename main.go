@@ -66,6 +66,10 @@ func main() {
 			case "cryptomus":
 				handleCryptomusButton(bot, update.CallbackQuery.Message.Chat.ID)
 				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
+
+			case "Payok":
+				handlePayOKButton(bot, update.CallbackQuery.Message.Chat.ID)
+				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
 			}
 			if strings.HasPrefix(update.CallbackQuery.Data, "addFavorite:") || strings.HasPrefix(update.CallbackQuery.Data, "removeFavorite:") {
 				handleAddToFavoritesCallback(bot, db, update.CallbackQuery)
@@ -181,6 +185,9 @@ func main() {
 			}
 			if exists && userPaymentStatus.CurrentState == "awaitingAmount" {
 				handlePaymentInput(db, bot, chatID, update.Message.Text)
+				continue
+			} else if exists && userPaymentStatus.CurrentState == "awaitingAmountPayOK" {
+				handlePaymentInputPayOK(db, bot, chatID, update.Message.Text)
 				continue
 			}
 			if strings.HasPrefix(update.Message.Text, "/start") {
