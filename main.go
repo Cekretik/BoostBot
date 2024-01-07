@@ -64,12 +64,12 @@ func main() {
 			case "replenishBalance":
 				handleReplenishCommand(bot, update.CallbackQuery.Message.Chat.ID)
 				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
-			case "cryptomus":
-				handleCryptomusButton(bot, update.CallbackQuery.Message.Chat.ID)
+			case "cryptomus_USDT", "cryptomus_BTC", "cryptomus_MATIC", "cryptomus_OTHER":
+				handleCryptomusButton(bot, update.CallbackQuery.Message.Chat.ID, db)
 				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
 
-			case "Payok":
-				handlePayOKButton(bot, update.CallbackQuery.Message.Chat.ID)
+			case "payok_SBP", "payok_RU":
+				handlePayOKButton(bot, update.CallbackQuery.Message.Chat.ID, db)
 				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
 			case "changeCurrencyToRUB":
 				handleChangeCurrency(bot, chatID, db, true)

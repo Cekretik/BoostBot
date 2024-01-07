@@ -62,10 +62,22 @@ func handleReplenishCommand(bot *tgbotapi.BotAPI, chatID int64) {
 	msgText := ("Выберите платежную систему")
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Cryptomus", "cryptomus"),
+			tgbotapi.NewInlineKeyboardButtonData("СБП|RUB", "payok_SBP"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Payok", "Payok"),
+			tgbotapi.NewInlineKeyboardButtonData("RU Карта|RUB", "payok_RU"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("USDT", "cryptomus_USDT"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("BTC", "cryptomus_BTC"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("MATIC", "cryptomus_MATIC"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Другая Крипта", "cryptomus_OTHER"),
 		),
 	)
 	cancelKeyboard := tgbotapi.NewReplyKeyboard(
@@ -79,32 +91,58 @@ func handleReplenishCommand(bot *tgbotapi.BotAPI, chatID int64) {
 	bot.Send(msg)
 }
 
-func handleCryptomusButton(bot *tgbotapi.BotAPI, chatID int64) {
+func handleCryptomusButton(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	userPaymentStatus := updateUserStatus(chatID)
 	userPaymentStatus.CurrentState = "awaitingAmount"
 	userPaymentStatus.OrderID = createOrderID(chatID+44984985, time.Now().Unix())
+
+	var user UserState
+	if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {
+		log.Printf("Error fetching user state: %v", err)
+		bot.Send(tgbotapi.NewMessage(chatID, "Произошла ошибка."))
+		return
+	}
+
 	msgText := "Введите желаемую сумму в долларах."
+	if user.Currency == "RUB" {
+		msgText = "Введите желаемую сумму в рублях."
+	}
+
 	cancelKeyboard := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton("Отмена"),
 		),
 	)
+
 	msg := tgbotapi.NewMessage(chatID, msgText)
 	msg.ReplyMarkup = cancelKeyboard
 	bot.Send(msg)
 }
 
-func handlePayOKButton(bot *tgbotapi.BotAPI, chatID int64) {
+func handlePayOKButton(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	userPaymentStatus := updateUserStatus(chatID)
 	userPaymentStatus.CurrentState = "awaitingAmountPayOK"
 	paymentID := createPaymentID(chatID, time.Now().Unix())
 	userPaymentStatus.OrderID = paymentID
+
+	var user UserState
+	if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {
+		log.Printf("Error fetching user state: %v", err)
+		bot.Send(tgbotapi.NewMessage(chatID, "Произошла ошибка."))
+		return
+	}
+
 	msgText := "Введите желаемую сумму в долларах."
+	if user.Currency == "RUB" {
+		msgText = "Введите желаемую сумму в рублях."
+	}
+
 	cancelKeyboard := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton("Отмена"),
 		),
 	)
+
 	msg := tgbotapi.NewMessage(chatID, msgText)
 	msg.ReplyMarkup = cancelKeyboard
 	bot.Send(msg)
@@ -112,10 +150,17 @@ func handlePayOKButton(bot *tgbotapi.BotAPI, chatID int64) {
 }
 func handlePaymentInput(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amountText string) {
 	userPaymentStatus := updateUserStatus(chatID)
+
 	if userPaymentStatus.CurrentState == "awaitingAmount" {
+		var user UserState
+		if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {
+			log.Printf("Error fetching user state: %v", err)
+			return
+		}
+
 		amount, err := strconv.ParseFloat(amountText, 64)
 		if err != nil || amount <= 0 {
-			msg := tgbotapi.NewMessage(chatID, "Введите корректную сумму в долларах.")
+			msg := tgbotapi.NewMessage(chatID, "Введите корректную сумму.")
 			userPaymentStatuses[chatID] = userPaymentStatus
 			cancelKeyboard := tgbotapi.NewReplyKeyboard(
 				tgbotapi.NewKeyboardButtonRow(
@@ -127,8 +172,9 @@ func handlePaymentInput(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amountT
 			return
 		}
 
-		if isOrderExpired(userPaymentStatus) {
-			userPaymentStatus.OrderID = createOrderID(chatID, time.Now().Unix())
+		if user.Currency == "RUB" {
+			rate := getCurrentCurrencyRate()
+			amount = convertAmount(amount, rate, false)
 		}
 
 		userPaymentStatuses[chatID] = userPaymentStatus
@@ -139,9 +185,15 @@ func handlePaymentInput(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amountT
 func handlePaymentInputPayOK(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amountText string) {
 	userPaymentStatus := updateUserStatus(chatID)
 	if userPaymentStatus.CurrentState == "awaitingAmountPayOK" {
+		var user UserState
+		if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {
+			log.Printf("Error fetching user state: %v", err)
+			return
+		}
+
 		amount, err := strconv.ParseFloat(amountText, 64)
 		if err != nil || amount <= 0 {
-			msg := tgbotapi.NewMessage(chatID, "Введите корректную сумму в долларах.")
+			msg := tgbotapi.NewMessage(chatID, "Введите корректную сумму.")
 			userPaymentStatuses[chatID] = userPaymentStatus
 			cancelKeyboard := tgbotapi.NewReplyKeyboard(
 				tgbotapi.NewKeyboardButtonRow(
@@ -152,17 +204,19 @@ func handlePaymentInputPayOK(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, am
 			bot.Send(msg)
 			return
 		}
-
-		userPaymentStatus.ReplenishAmount = amount
-		if isOrderExpired(userPaymentStatus) {
-			userPaymentStatus.OrderID = createPaymentID(chatID, time.Now().Unix())
+		originalAmount := amount
+		currency := "USD"
+		if user.Currency == "RUB" {
+			currency = "RUB"
+		} else {
+			amount = originalAmount
 		}
 
+		createAndSendPaymentLinkPayOK(db, bot, chatID, amount, userPaymentStatus.OrderID, time.Now().Unix(), currency)
+		userPaymentStatus.CurrentState = ""
 		userPaymentStatuses[chatID] = userPaymentStatus
-		createAndSendPaymentLinkPayOK(db, bot, chatID, amount, userPaymentStatus.OrderID, time.Now().Unix())
 	}
 }
-
 func createAndSendPaymentLink(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amount float64, orderID string, timestamp int64) {
 	paymentResponse, err := CreatePayment(fmt.Sprintf("%.4f", amount), "USD", orderID)
 	if err != nil {
@@ -195,14 +249,19 @@ func createAndSendPaymentLink(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, a
 		sendStandardKeyboardAfterPayment(bot, chatID)
 	}
 }
-func createAndSendPaymentLinkPayOK(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amount float64, paymentID string, timestamp int64) {
-	paymentURL, err := CreatePayOKPayment(fmt.Sprintf("%.2f", amount), paymentID, "USD", "Описание платежа")
+func createAndSendPaymentLinkPayOK(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amount float64, paymentID string, timestamp int64, currency string) {
+	originalAmount := amount
+	if currency == "RUB" {
+		rate := getCurrentCurrencyRate()
+		amount = convertAmount(originalAmount, rate, false)
+	}
+
+	paymentURL, err := CreatePayOKPayment(fmt.Sprintf("%.2f", originalAmount), paymentID, currency, "Описание платежа")
 	if err != nil {
 		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при создании платежа."))
 		return
 	}
 
-	// Создание записи о платеже в БД
 	newPayment := Payments{
 		ChatID:  int(chatID),
 		OrderID: paymentID,
@@ -213,21 +272,21 @@ func createAndSendPaymentLinkPayOK(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int
 	}
 	db.Create(&newPayment)
 
-	// Проверка наличия URL для платежа
-	if paymentURL == "" {
-		bot.Send(tgbotapi.NewMessage(chatID, "Не удалось получить ссылку на платеж, попробуйте снова."))
-	} else {
-		inlineKeyboard := tgbotapi.NewInlineKeyboardMarkup(
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonURL("Оплатить", paymentURL),
-			),
-		)
-		msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Для пополнения на сумму $%.2f нажмите на кнопку оплатить:", amount))
-		msg.ReplyMarkup = inlineKeyboard
-		bot.Send(msg)
-		delete(userPaymentStatuses, chatID)
-		sendStandardKeyboardAfterPayment(bot, chatID)
+	paymentMessage := fmt.Sprintf("Для пополнения на сумму $%.2f нажмите на кнопку оплатить:", amount)
+	if currency == "RUB" {
+		paymentMessage = fmt.Sprintf("Для пополнения на сумму %.2f₽ нажмите на кнопку оплатить:", originalAmount)
 	}
+
+	inlineKeyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonURL("Оплатить", paymentURL),
+		),
+	)
+	msg := tgbotapi.NewMessage(chatID, paymentMessage)
+	msg.ReplyMarkup = inlineKeyboard
+	bot.Send(msg)
+	delete(userPaymentStatuses, chatID)
+	sendStandardKeyboardAfterPayment(bot, chatID)
 }
 func handleWebhook(db *gorm.DB, w http.ResponseWriter, r *http.Request) {
 	var webhookData CryptomusWebhookData
