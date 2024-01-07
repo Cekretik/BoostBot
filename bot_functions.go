@@ -17,6 +17,7 @@ func sendKeyboardAfterOrder(bot *tgbotapi.BotAPI, chatID int64) {
 	messageText := "Заказ создан, ожидайте."
 	msg := tgbotapi.NewMessage(chatID, messageText)
 	balanceButton := tgbotapi.NewKeyboardButton("💰Баланс")
+	settingsButton := tgbotapi.NewKeyboardButton("⚙️Настройки")
 	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
 	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
 	makeFavoriteButton := tgbotapi.NewKeyboardButton("❤️Избранное")
@@ -26,6 +27,7 @@ func sendKeyboardAfterOrder(bot *tgbotapi.BotAPI, chatID int64) {
 		tgbotapi.NewKeyboardButtonRow(balanceButton, ordersButton),
 		tgbotapi.NewKeyboardButtonRow(makeOrderButton, makeFavoriteButton),
 		tgbotapi.NewKeyboardButtonRow(makeTechSupButton, makeReferralpButton),
+		tgbotapi.NewKeyboardButtonRow(settingsButton),
 	)
 	msg.ReplyMarkup = quickReplyMarkup
 	bot.Send(msg)
@@ -34,6 +36,7 @@ func sendStandardKeyboard(bot *tgbotapi.BotAPI, chatID int64) {
 	messageText := "Отменено"
 	msg := tgbotapi.NewMessage(chatID, messageText)
 	balanceButton := tgbotapi.NewKeyboardButton("💰Баланс")
+	settingsButton := tgbotapi.NewKeyboardButton("⚙️Настройки")
 	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
 	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
 	makeFavoriteButton := tgbotapi.NewKeyboardButton("❤️Избранное")
@@ -43,8 +46,8 @@ func sendStandardKeyboard(bot *tgbotapi.BotAPI, chatID int64) {
 		tgbotapi.NewKeyboardButtonRow(balanceButton, ordersButton),
 		tgbotapi.NewKeyboardButtonRow(makeOrderButton, makeFavoriteButton),
 		tgbotapi.NewKeyboardButtonRow(makeTechSupButton, makeReferralpButton),
+		tgbotapi.NewKeyboardButtonRow(settingsButton),
 	)
-
 	msg.ReplyMarkup = quickReplyMarkup
 	bot.Send(msg)
 }
@@ -53,6 +56,7 @@ func sendStandardKeyboardAfterPayment(bot *tgbotapi.BotAPI, chatID int64) {
 	messageText := "После оплаты проверьте баланс."
 	msg := tgbotapi.NewMessage(chatID, messageText)
 	balanceButton := tgbotapi.NewKeyboardButton("💰Баланс")
+	settingsButton := tgbotapi.NewKeyboardButton("⚙️Настройки")
 	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
 	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
 	makeFavoriteButton := tgbotapi.NewKeyboardButton("❤️Избранное")
@@ -62,6 +66,7 @@ func sendStandardKeyboardAfterPayment(bot *tgbotapi.BotAPI, chatID int64) {
 		tgbotapi.NewKeyboardButtonRow(balanceButton, ordersButton),
 		tgbotapi.NewKeyboardButtonRow(makeOrderButton, makeFavoriteButton),
 		tgbotapi.NewKeyboardButtonRow(makeTechSupButton, makeReferralpButton),
+		tgbotapi.NewKeyboardButtonRow(settingsButton),
 	)
 	msg.ReplyMarkup = quickReplyMarkup
 	bot.Send(msg)
@@ -70,6 +75,7 @@ func WelcomeMessage(bot *tgbotapi.BotAPI, chatID int64) {
 	messageText := "Добро пожаловать!"
 	msg := tgbotapi.NewMessage(chatID, messageText)
 	balanceButton := tgbotapi.NewKeyboardButton("💰Баланс")
+	settingsButton := tgbotapi.NewKeyboardButton("⚙️Настройки")
 	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
 	makeOrderButton := tgbotapi.NewKeyboardButton("⭐️Сделать заказ")
 	makeFavoriteButton := tgbotapi.NewKeyboardButton("❤️Избранное")
@@ -79,6 +85,7 @@ func WelcomeMessage(bot *tgbotapi.BotAPI, chatID int64) {
 		tgbotapi.NewKeyboardButtonRow(balanceButton, ordersButton),
 		tgbotapi.NewKeyboardButtonRow(makeOrderButton, makeFavoriteButton),
 		tgbotapi.NewKeyboardButtonRow(makeTechSupButton, makeReferralpButton),
+		tgbotapi.NewKeyboardButtonRow(settingsButton),
 	)
 	msg.ReplyMarkup = quickReplyMarkup
 	bot.Send(msg)
@@ -96,6 +103,20 @@ func techSupMessage(bot *tgbotapi.BotAPI, chatID int64) {
 	)
 	msg.ReplyMarkup = keyboard
 
+	bot.Send(msg)
+}
+func sendSettingsKeyboard(bot *tgbotapi.BotAPI, chatID int64) {
+	messageText := "⚙️Настройки"
+	msg := tgbotapi.NewMessage(chatID, messageText)
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Сменить валюту на рубли", "changeCurrencyToRUB"),
+			tgbotapi.NewInlineKeyboardButtonData("Сменить валюту на доллары", "changeCurrencyToUSD"),
+		),
+	)
+
+	msg.ReplyMarkup = keyboard
 	bot.Send(msg)
 }
 
@@ -282,18 +303,33 @@ func CreateServiceKeyboard(db *gorm.DB, subcategoryID, currentPage, totalService
 	return tgbotapi.NewInlineKeyboardMarkup(rows...), nil
 }
 
-func FormatServiceInfo(service Services, subcategory Subcategory, increasePercent float64) string {
+func FormatServiceInfo(service Services, subcategory Subcategory, increasePercent float64, userCurrency string, currencyRate float64) string {
 	increasedRate := service.Rate + service.Rate*(increasePercent/100)
 
-	return fmt.Sprintf(
-		"ℹ️ Информация об услуге\n\n"+
-			"🔢 ID услуги: %d\n"+
-			"📝 Услуга: %s\n\n"+
-			"📝 Категория: %s\n\n"+
-			"💸 Цена за 1000: $%.*f\n\n"+
-			"📉 Минимальное количество: %d\n"+
-			"📈 Максимальное количество: %d",
-		service.ID, service.Name, subcategory.Name, decimalPlaces, increasedRate, service.Min, service.Max)
+	if userCurrency == "RUB" {
+		increasedRate = convertAmount(increasedRate, currencyRate, true)
+		currencySymbol := "₽"
+		return fmt.Sprintf(
+			"ℹ️ Информация об услуге\n\n"+
+				"🔢 ID услуги: %d\n"+
+				"📝 Услуга: %s\n\n"+
+				"📝 Категория: %s\n\n"+
+				"💸 Цена за 1000: %s%.*f\n\n"+
+				"📉 Минимальное количество: %d\n"+
+				"📈 Максимальное количество: %d",
+			service.ID, service.Name, subcategory.Name, currencySymbol, decimalPlaces, increasedRate, service.Min, service.Max)
+	} else {
+		currencySymbol := "$"
+		return fmt.Sprintf(
+			"ℹ️ Информация об услуге\n\n"+
+				"🔢 ID услуги: %d\n"+
+				"📝 Услуга: %s\n\n"+
+				"📝 Категория: %s\n\n"+
+				"💸 Цена за 1000: %s%.*f\n\n"+
+				"📉 Минимальное количество: %d\n"+
+				"📈 Максимальное количество: %d",
+			service.ID, service.Name, subcategory.Name, currencySymbol, decimalPlaces, increasedRate, service.Min, service.Max)
+	}
 }
 
 // Функция для обработки нажатия кнопки "Баланс"
@@ -304,7 +340,23 @@ func handleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
 		return
 	}
 
-	balanceMsgText := fmt.Sprintf("🆔 Ваш ID: %d\n💵 Ваш баланс: $%.*f", userState.UserID, decimalPlaces, userState.Balance)
+	// Получаем текущий курс обмена
+	rate, err := getCurrencyRate()
+	if err != nil {
+		log.Printf("Error getting currency rate: %v", err)
+		return
+	}
+
+	balance := userState.Balance
+	var balanceMsgText string
+
+	if userState.Currency == "RUB" {
+		balance = convertAmount(balance, rate, true)
+		balanceMsgText = fmt.Sprintf("🆔 Ваш ID: %d\n💵 Ваш баланс: ₽%.*f", userState.UserID, decimalPlaces, balance)
+	} else {
+		balanceMsgText = fmt.Sprintf("🆔 Ваш ID: %d\n💵 Ваш баланс: $%.*f", userState.UserID, decimalPlaces, balance)
+	}
+
 	msg := tgbotapi.NewMessage(userID, balanceMsgText)
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
@@ -403,6 +455,44 @@ func ShowReferralStats(bot *tgbotapi.BotAPI, db *gorm.DB, userID int64) {
 	msgText := fmt.Sprintf("Приглашено человек: %d\nПолучено с ваших рефералов: $%.2f\nВаша партнёрская ссылка: %s",
 		count, totalEarned, GenerateReferralLink(userID))
 
+	msg := tgbotapi.NewMessage(userID, msgText)
+	bot.Send(msg)
+}
+
+func convertAmount(amount float64, rate float64, toRUB bool) float64 {
+	if toRUB {
+		return amount * rate
+	} else {
+		return amount / rate
+	}
+}
+
+func handleChangeCurrency(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB, toRUB bool) {
+	var user UserState
+	err := db.Where("user_id = ?", userID).First(&user).Error
+	if err != nil {
+		log.Printf("Error getting user: %v", err)
+		return
+	}
+
+	if toRUB {
+		user.Currency = "RUB"
+	} else {
+		user.Currency = "USD"
+	}
+
+	err = db.Save(&user).Error
+	if err != nil {
+		log.Printf("Error saving user: %v", err)
+		return
+	}
+
+	msgText := "Валюта изменена на "
+	if toRUB {
+		msgText += "рубли."
+	} else {
+		msgText += "доллары."
+	}
 	msg := tgbotapi.NewMessage(userID, msgText)
 	bot.Send(msg)
 }

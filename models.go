@@ -11,6 +11,7 @@ type UserState struct {
 	Subscribed bool       `gorm:"column:subscribed" json:"subscribed"`
 	ChannelID  int64      `gorm:"column:channel_id" json:"channel_id"`
 	Balance    float64    `gorm:"column:balance" json:"balance"`
+	Currency   string     `gorm:"column:currency" json:"currency"`
 	Favorites  []Services `gorm:"many2many:user_favorites;"`
 }
 type Category struct {

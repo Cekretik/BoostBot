@@ -41,6 +41,7 @@ func UpdateUserStatus(db *gorm.DB, channelID int64, userID int64, subscribed boo
 				ChannelID:  channelID,
 				Subscribed: subscribed,
 				Balance:    balance,
+				Currency:   "RUB",
 			}
 			if err := db.Create(&userState).Error; err != nil {
 				log.Printf("Error creating new user state: %v", err)

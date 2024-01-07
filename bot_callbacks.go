@@ -149,7 +149,13 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 		if err != nil {
 			increasePercent = 0 // или установите значение по умолчанию
 		}
-		msgText := FormatServiceInfo(service, subcategory, increasePercent)
+		userCurrency, err := getUserCurrency(db, userID)
+		if err != nil {
+			log.Printf("Error getting user currency: %v", err)
+			return
+		}
+		currencyRate := getCurrentCurrencyRate()
+		msgText := FormatServiceInfo(service, subcategory, increasePercent, userCurrency, currencyRate)
 		backData := "backToServices:" + service.CategoryID
 		keyboard := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(

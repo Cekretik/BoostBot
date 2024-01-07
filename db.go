@@ -464,3 +464,16 @@ func RemoveServiceFromFavorites(db *gorm.DB, userID int64, serviceID int) error 
 
 	return db.Model(&user).Association("Favorites").Delete(&service)
 }
+
+func getUserCurrency(db *gorm.DB, userID int64) (string, error) {
+	var user UserState
+	if err := db.Where("user_id = ?", userID).First(&user).Error; err != nil {
+		log.Printf("Error fetching user state: %v", err)
+		return "", err
+	}
+	return user.Currency, nil
+}
+
+func getCurrentCurrencyRate() float64 {
+	return currentRate
+}

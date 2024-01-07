@@ -40,6 +40,7 @@ func main() {
 	go UpdateSubcategoriesInDB(db, doneCategories)
 	go UpdateServicesInDB(db, doneCategories)
 	go updateOrdersPeriodically(db, doneOrder)
+	go updateCurrencyRatePeriodically()
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	updates, err := bot.GetUpdatesChan(u)
@@ -57,7 +58,7 @@ func main() {
 
 	for update := range updates {
 		if update.CallbackQuery != nil {
-
+			chatID := update.CallbackQuery.Message.Chat.ID
 			callbackData := update.CallbackQuery.Data
 			switch callbackData {
 			case "replenishBalance":
@@ -70,6 +71,10 @@ func main() {
 			case "Payok":
 				handlePayOKButton(bot, update.CallbackQuery.Message.Chat.ID)
 				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
+			case "changeCurrencyToRUB":
+				handleChangeCurrency(bot, chatID, db, true)
+			case "changeCurrencyToUSD":
+				handleChangeCurrency(bot, chatID, db, false)
 			}
 			if strings.HasPrefix(update.CallbackQuery.Data, "addFavorite:") || strings.HasPrefix(update.CallbackQuery.Data, "removeFavorite:") {
 				handleAddToFavoritesCallback(bot, db, update.CallbackQuery)
@@ -253,6 +258,8 @@ func main() {
 						techSupMessage(bot, update.Message.Chat.ID)
 					} else if update.Message.Text == "👤 Реферальная система" {
 						ShowReferralStats(bot, db, update.Message.Chat.ID)
+					} else if update.Message.Text == "⚙️Настройки" {
+						sendSettingsKeyboard(bot, update.Message.Chat.ID)
 					} else {
 						WelcomeMessage(bot, update.Message.Chat.ID)
 						SendPromotionMessage(bot, update.Message.Chat.ID, db)

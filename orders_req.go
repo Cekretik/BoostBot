@@ -7,6 +7,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -109,4 +112,56 @@ func createOrder(order Order, token string) (UserOrders, error) {
 	}
 
 	return responseOrder, nil
+}
+
+type RatesResponse struct {
+	RUB float64 `json:"RUB"`
+}
+
+var currentRate float64
+
+func getCurrencyRate() (float64, error) {
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", "https://api.stagesmm.com/rates", nil)
+	if err != nil {
+		return 0, err
+	}
+
+	req.Header.Add("Authorization", token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, err
+	}
+
+	// log.Printf("Response body: %s", string(body))
+
+	var rate float64
+	rate, err = strconv.ParseFloat(strings.TrimSpace(string(body)), 64)
+	if err != nil {
+		log.Printf("Error parsing rate: %v", err)
+		return 0, err
+	}
+
+	// log.Printf("Currency rate: %f", rate)
+	return rate, nil
+}
+
+func updateCurrencyRatePeriodically() {
+	for {
+		rate, err := getCurrencyRate()
+		if err != nil {
+			log.Printf("Error getting currency rate: %v", err)
+		} else {
+			currentRate = rate
+			log.Printf("Updated currency rate: %f", currentRate)
+		}
+		time.Sleep(1 * time.Hour)
+	}
 }

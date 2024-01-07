@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -54,6 +55,14 @@ func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 	chatID := update.Message.Chat.ID
 	userStatus := getUserStatus(chatID)
 
+	var user UserState
+	if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {
+		log.Printf("Error fetching user state: %v", err)
+		return
+	}
+	userCurrency := user.Currency
+	currencyRate := getCurrentCurrencyRate()
+
 	switch userStatus.CurrentState {
 	case "awaitingLink":
 		link := update.Message.Text
@@ -87,7 +96,6 @@ func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 		// Получение баланса пользователя
 		var user UserState
 		if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {
-			// Обработка ошибки получения пользователя
 			bot.Send(tgbotapi.NewMessage(chatID, "Произошла ошибка при получении информации о вашем балансе."))
 			return
 		}
@@ -103,7 +111,14 @@ func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 					tgbotapi.NewKeyboardButton("Отмена"),
 				),
 			)
-			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Цена услуги: $%.*f. Ваш баланс: $%.*f.", decimalPlaces, cost, decimalPlaces, user.Balance))
+			var infoMsg string
+			if userCurrency == "RUB" {
+				cost = convertAmount(cost, currencyRate, true)
+				infoMsg = fmt.Sprintf("Цена услуги: ₽%.*f. Ваш баланс: ₽%.*f.", decimalPlaces, cost, decimalPlaces, convertAmount(user.Balance, currencyRate, true))
+			} else {
+				infoMsg = fmt.Sprintf("Цена услуги: $%.*f. Ваш баланс: $%.*f.", decimalPlaces, cost, decimalPlaces, user.Balance)
+			}
+			msg := tgbotapi.NewMessage(chatID, infoMsg)
 			msg.ReplyMarkup = cancelKeyboard
 			msg.ReplyMarkup = keyboard
 			bot.Send(msg)
@@ -118,7 +133,14 @@ func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 					tgbotapi.NewKeyboardButton("Отмена"),
 				),
 			)
-			msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("На вашем балансе недостаточно средств. Цена услуги: $%.*f. Ваш баланс: $%.*f.", decimalPlaces, cost, decimalPlaces, user.Balance))
+			var infoMsg string
+			if userCurrency == "RUB" {
+				cost = convertAmount(cost, currencyRate, true)
+				infoMsg = fmt.Sprintf("На вашем балансе недостаточно средств. Цена услуги: ₽%.*f. Ваш баланс: ₽%.*f.", decimalPlaces, cost, decimalPlaces, convertAmount(user.Balance, currencyRate, true))
+			} else {
+				infoMsg = fmt.Sprintf("Цена услуги: $%.*f. Ваш баланс: $%.*f.", decimalPlaces, cost, decimalPlaces, user.Balance)
+			}
+			msg := tgbotapi.NewMessage(chatID, infoMsg)
 			msg.ReplyMarkup = cancelKeyboard
 			msg.ReplyMarkup = keyboard
 			bot.Send(msg)
