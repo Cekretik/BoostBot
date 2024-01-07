@@ -416,18 +416,6 @@ func updatePaymentStatusInDB(db *gorm.DB, orderID, status string) error {
 	return nil
 }
 
-func CheckIfFavorite(db *gorm.DB, userID int64, ID int) (bool, error) {
-	var count int64
-	var service Services
-	err := db.Table("user_favorites").
-		Where("user_state_id = ? AND services_id = ?", userID, service.ID).
-		Count(&count).Error
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
-}
-
 func AddServiceToFavorites(db *gorm.DB, userID int64, serviceID int) error {
 	var user UserState
 	if err := db.Where("user_id = ?", userID).First(&user).Error; err != nil {

@@ -132,19 +132,12 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 			return
 		}
 
-		isFavorite, err := CheckIfFavorite(db, userID, service.ID)
-		if err != nil {
-			log.Printf("Error checking if service '%s' is favorite: %v", service.Name, err)
-			return
-		}
-
-		// Создаем текст для кнопки в зависимости от того, находится ли услуга в избранных
-		favoriteButtonText := "Добавить в избранное"
+		favoriteButtonText := "✅Добавить в избранное"
 		favoriteCallbackData := fmt.Sprintf("addFavorite:%d", service.ID)
-		if isFavorite {
-			favoriteButtonText = "Удалить из избранного"
-			favoriteCallbackData = fmt.Sprintf("removeFavorite:%d", service.ID)
-		}
+
+		removeFavoriteButtonText := "❌Удалить из избранного"
+		removeFavoriteCallbackData := fmt.Sprintf("removeFavorite:%d", service.ID)
+
 		increasePercent, err := strconv.ParseFloat(os.Getenv("PRICE_PERCENT"), 64)
 		if err != nil {
 			increasePercent = 0 // или установите значение по умолчанию
@@ -160,10 +153,11 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 		keyboard := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData("🔙Вернуться к услугам", backData),
-				tgbotapi.NewInlineKeyboardButtonData(favoriteButtonText, favoriteCallbackData),
+				tgbotapi.NewInlineKeyboardButtonData("➕Заказать", "order:"+strconv.Itoa(service.ID)),
 			),
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("➕Заказать", "order:"+strconv.Itoa(service.ID)),
+				tgbotapi.NewInlineKeyboardButtonData(removeFavoriteButtonText, removeFavoriteCallbackData),
+				tgbotapi.NewInlineKeyboardButtonData(favoriteButtonText, favoriteCallbackData),
 			),
 		)
 
