@@ -75,6 +75,12 @@ func main() {
 				handleChangeCurrency(bot, chatID, db, true)
 			case "changeCurrencyToUSD":
 				handleChangeCurrency(bot, chatID, db, false)
+			case "profile:favorites":
+				handleFavoritesCommand(bot, db, chatID)
+				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
+			case "promo":
+				handlePromoCommand(bot, chatID, db)
+				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
 			}
 			if strings.HasPrefix(update.CallbackQuery.Data, "addFavorite:") || strings.HasPrefix(update.CallbackQuery.Data, "removeFavorite:") {
 				handleAddToFavoritesCallback(bot, db, update.CallbackQuery)
@@ -248,20 +254,21 @@ func main() {
 				}
 
 				if isSubscribed {
-					if update.Message.Text == "💰Баланс" {
+					if update.Message.Text == "💳 Баланс" {
 						handleBalanceCommand(bot, update.Message.Chat.ID, db)
 					} else if update.Message.Text == "📝Мои заказы" {
 						handleOrdersCommand(bot, update.Message.Chat.ID, db)
-					} else if update.Message.Text == "❤️Избранное" {
-						handleFavoritesCommand(bot, db, update.Message.Chat.ID)
-					} else if update.Message.Text == "📞Тех.поддержка" {
+					} else if update.Message.Text == "⛑ Помощь" {
 						techSupMessage(bot, update.Message.Chat.ID)
-					} else if update.Message.Text == "👤 Реферальная система" {
+					} else if update.Message.Text == "🤝 Партнерам" {
 						ShowReferralStats(bot, db, update.Message.Chat.ID)
 					} else if update.Message.Text == "⚙️Настройки" {
 						sendSettingsKeyboard(bot, update.Message.Chat.ID)
+					} else if update.Message.Text == "✍️Сделать заказ" {
+						SendPromotionMessage(bot, update.Message.Chat.ID, db)
+					} else if update.Message.Text == "🧩Профиль" {
+						handleProfileCommand(bot, update.Message.Chat.ID, db)
 					} else {
-						WelcomeMessage(bot, update.Message.Chat.ID)
 						SendPromotionMessage(bot, update.Message.Chat.ID, db)
 					}
 				} else {
