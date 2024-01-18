@@ -110,3 +110,16 @@ type Referral struct {
 	ReferredID   int64   `gorm:"column:referred_id"`
 	AmountEarned float64 `gorm:"column:amount_earned"`
 }
+
+type PromoCode struct {
+	Code           string  `gorm:"primaryKey"`
+	Discount       float64 `gorm:"column:discount"`
+	MaxActivations int64   `gorm:"column:max_activations"`
+	Activations    int64   `gorm:"column:activations"`
+}
+
+type UsedPromoCode struct {
+	UserID    int64  `gorm:"column:user_id"`
+	PromoCode string `gorm:"column:promo_code"`
+	Used      bool   `gorm:"column:used"`
+}

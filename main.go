@@ -179,10 +179,31 @@ func main() {
 				}
 			}
 		}
+		if update.Message != nil && update.Message.Text != "" {
+			chatID := update.Message.Chat.ID
 
+			if status, exists := userPromoStatuses[chatID]; exists && status.PromoState == "awaitingPromoCode" {
+				processPromoCodeInput(bot, chatID, update.Message.Text, db)
+				delete(userPromoStatuses, chatID) // Удаление статуса после обработки
+				continue
+			}
+			if update.Message.Text == "Отмена" {
+				if _, exists := userPromoStatuses[chatID]; exists {
+					delete(userPromoStatuses, chatID)
+					sendStandardKeyboard(bot, chatID)
+					continue
+				}
+			}
+			if status, exists := userPromoStatuses[chatID]; exists && status.PromoState == "awaitingPromoCode" {
+				processPromoCodeInput(bot, chatID, update.Message.Text, db)
+				delete(userPromoStatuses, chatID)
+				continue
+			}
+		}
 		if update.Message != nil {
 			chatID := update.Message.Chat.ID
 			userPaymentStatus, exists := userPaymentStatuses[chatID]
+
 			if update.Message.Text == "Отмена" {
 				if _, exists := userStatuses[chatID]; exists {
 					delete(userStatuses, chatID)
@@ -202,29 +223,44 @@ func main() {
 				continue
 			}
 			if strings.HasPrefix(update.Message.Text, "/start") {
-				referrerIDStr := strings.TrimPrefix(update.Message.Text, "/start ")
-				referrerID, err := strconv.ParseInt(referrerIDStr, 10, 64)
-
-				if err == nil && referrerID != 0 {
-					// Проверяем, существует ли пользователь-реферер
-					var referrer UserState
-					if err := db.Where("user_id = ?", referrerID).First(&referrer).Error; err == nil {
-						// Проверяем, что реферер и реферал - разные люди
-						if referrer.UserID != int64(update.Message.From.ID) {
-							// Создаем запись о реферале, если она еще не существует
-							var existingReferral Referral
-							if err := db.Where("referrer_id = ? AND referred_id = ?", referrerID, update.Message.From.ID).First(&existingReferral).Error; err != nil {
-								// Добавляем нового реферала
-								newReferral := Referral{
-									ReferrerID:   referrerID,
-									ReferredID:   int64(update.Message.From.ID),
-									AmountEarned: 0,
+				args := strings.Split(update.Message.Text, " ")
+				if len(args) > 1 {
+					param := args[1]
+					// Проверяем, является ли параметр специальной ссылкой
+					if strings.Contains(param, "_") {
+						// Обработка специальной ссылки
+						processSpecialLink(bot, update.Message.Chat.ID, param, db)
+					} else {
+						// Обработка реферального ID
+						referrerID, err := strconv.ParseInt(param, 10, 64)
+						if err == nil && referrerID != 0 {
+							// Проверяем, существует ли пользователь-реферер
+							var referrer UserState
+							if err := db.Where("user_id = ?", referrerID).First(&referrer).Error; err == nil {
+								// Проверяем, что реферер и реферал - разные люди
+								if referrer.UserID != int64(update.Message.From.ID) {
+									// Создаем запись о реферале, если она еще не существует
+									var existingReferral Referral
+									if err := db.Where("referrer_id = ? AND referred_id = ?", referrerID, update.Message.From.ID).First(&existingReferral).Error; err != nil {
+										// Добавляем нового реферала
+										newReferral := Referral{
+											ReferrerID:   referrerID,
+											ReferredID:   int64(update.Message.From.ID),
+											AmountEarned: 0,
+										}
+										db.Create(&newReferral)
+									}
 								}
-								db.Create(&newReferral)
 							}
 						}
 					}
 				}
+			} else if strings.HasPrefix(update.Message.Text, "/createpromo") {
+				handleCreatePromoCommand(bot, update, db)
+				continue
+			} else if strings.HasPrefix(update.Message.Text, "/createurl") {
+				handleCreateUrlCommand(bot, update, db)
+				continue
 			}
 			if userStatus, exists := userStatuses[chatID]; exists && userStatus.CurrentState != "" {
 				serviceID, err := strconv.Atoi(userStatus.PendingServiceID)
@@ -268,6 +304,8 @@ func main() {
 						SendPromotionMessage(bot, update.Message.Chat.ID, db)
 					} else if update.Message.Text == "🧩Профиль" {
 						handleProfileCommand(bot, update.Message.Chat.ID, db)
+						// } else if update.Message.Text == "/createpromo" {
+						// 	handleCreatePromoCommand(bot, update, db)
 					} else {
 						SendPromotionMessage(bot, update.Message.Chat.ID, db)
 					}

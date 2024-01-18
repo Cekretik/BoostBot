@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/joho/godotenv"
@@ -368,19 +369,6 @@ func handleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
 	bot.Send(msg)
 }
 
-func handlePromoCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
-	messageText := "✍️Введите ваш промокод:"
-	cancelKeyboard := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("Отмена"),
-		),
-	)
-	msg := tgbotapi.NewMessage(chatID, messageText)
-	msg.ReplyMarkup = cancelKeyboard
-	bot.Send(msg)
-	sendStandardKeyboard(bot, chatID)
-}
-
 func handleProfileCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	var userState UserState
 	if err := db.Where("user_id = ?", chatID).First(&userState).Error; err != nil {
@@ -529,4 +517,229 @@ func handleChangeCurrency(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB, toRUB
 	}
 	msg := tgbotapi.NewMessage(userID, msgText)
 	bot.Send(msg)
+}
+
+type UserPromoStatus struct {
+	ChatID     int64
+	PromoState string
+}
+
+var userPromoStatuses = make(map[int64]*UserPromoStatus)
+
+func handlePromoCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
+	messageText := "✍️Введите ваш промокод:"
+	cancelKeyboard := tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("Отмена"),
+		),
+	)
+	userPromoStatuses[chatID] = &UserPromoStatus{
+		ChatID:     chatID,
+		PromoState: "awaitingPromoCode",
+	}
+	msg := tgbotapi.NewMessage(chatID, messageText)
+	msg.ReplyMarkup = cancelKeyboard
+	bot.Send(msg)
+
+}
+
+func processPromoCodeInput(bot *tgbotapi.BotAPI, chatID int64, promoCode string, db *gorm.DB) {
+	if promoCode == "Отмена" {
+		sendStandardKeyboard(bot, chatID)
+		return
+	}
+
+	var promo PromoCode
+	if err := db.Where("code = ?", promoCode).First(&promo).Error; err != nil {
+		msg := tgbotapi.NewMessage(chatID, "Промокод не найден.")
+		msg.ReplyMarkup = CreateQuickReplyMarkup()
+		bot.Send(msg)
+		return
+	}
+	if promo.Activations >= promo.MaxActivations {
+		msg := tgbotapi.NewMessage(chatID, "Этот промокод уже использован максимальное количество раз.")
+		msg.ReplyMarkup = CreateQuickReplyMarkup()
+		bot.Send(msg)
+		return
+	}
+
+	var usedPromo UsedPromoCode
+	if err := db.Where("user_id = ? AND promo_code = ?", chatID, promoCode).First(&usedPromo).Error; err == nil {
+		msg := tgbotapi.NewMessage(chatID, "Вы уже использовали этот промокод.")
+		msg.ReplyMarkup = CreateQuickReplyMarkup()
+		bot.Send(msg)
+		return
+	}
+
+	newUsedPromo := UsedPromoCode{
+		UserID:    chatID,
+		PromoCode: promoCode,
+	}
+	db.Create(&newUsedPromo)
+
+	promo.Activations++
+	db.Save(&promo)
+
+	msg := tgbotapi.NewMessage(chatID, "Промокод успешно применен.")
+	msg.ReplyMarkup = CreateQuickReplyMarkup()
+	bot.Send(msg)
+}
+
+func handleCreatePromoCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *gorm.DB) {
+	if !isAdmin(bot, int64(update.Message.From.ID)) {
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "У вас нет прав доступа к этой команде."))
+		return
+	}
+
+	args := strings.Split(update.Message.Text, " ")
+	if len(args) != 3 {
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Неверный формат. Используйте: /createpromo [скидка] [максимальное количество использований]"))
+		return
+	}
+
+	var discount float64
+	var maxActivations int64
+	var err error
+
+	discount, err = strconv.ParseFloat(args[1], 64)
+	if err != nil || discount <= 0 {
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Неверный формат скидки."))
+		return
+	}
+
+	maxActivations, err = strconv.ParseInt(args[2], 10, 64)
+	if err != nil || maxActivations <= 0 {
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Неверный формат количества использований."))
+		return
+	}
+
+	promo, err := savePromoCode(db, discount, maxActivations)
+	if err != nil {
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка при создании промокода."))
+		return
+	}
+
+	bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Промокод создан: %s", promo.Code)))
+}
+func isAdmin(bot *tgbotapi.BotAPI, userID int64) bool {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	channelIDStr := os.Getenv("CHANNEL_ID")
+	channelID, err := strconv.ParseInt(channelIDStr, 10, 64)
+	if err != nil {
+		log.Fatalf("Error parsing CHANNEL_ID: %v", err)
+	}
+
+	member, err := bot.GetChatMember(tgbotapi.ChatConfigWithUser{
+		ChatID: channelID,
+		UserID: int(userID),
+	})
+	if err != nil {
+		log.Printf("Ошибка при получении статуса пользователя: %v", err)
+		return false
+	}
+
+	return member.Status == "administrator" || member.Status == "creator"
+}
+
+func handleCreateUrlCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *gorm.DB) {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	botLink := os.Getenv("BOT_LINK")
+	if !isAdmin(bot, int64(update.Message.From.ID)) {
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "У вас не достаточно прав"))
+		return
+	}
+
+	args := strings.Split(update.Message.Text, " ")
+	if len(args) != 4 {
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Неверный формат. Используйте: /createurl [название] [сумма] [кол-во переходов]"))
+		return
+	}
+
+	linkName, amountStr, maxClicksStr := args[1], args[2], args[3]
+	amount, err := strconv.ParseFloat(amountStr, 64)
+	if err != nil {
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка в формате суммы."))
+		return
+	}
+	maxClicks, err := strconv.ParseInt(maxClicksStr, 10, 64)
+	if err != nil {
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка в формате количества переходов."))
+		return
+	}
+
+	linkCode := GenerateSpecialLink(linkName, amountStr, maxClicksStr)
+	promo := PromoCode{
+		Code:           linkCode,
+		Discount:       amount,
+		MaxActivations: maxClicks,
+		Activations:    0,
+	}
+	db.Create(&promo)
+	specialLink := fmt.Sprintf(botLink+"?start=%s", linkCode)
+	bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Ссылка создана: %s", specialLink)))
+}
+
+func GenerateSpecialLink(linkName, amount, maxClicks string) string {
+	return fmt.Sprintf("%s_%s_%s", linkName, amount, maxClicks)
+}
+func processSpecialLink(bot *tgbotapi.BotAPI, chatID int64, linkCode string, db *gorm.DB) {
+	var promo PromoCode
+	var usedPromos []UsedPromoCode
+	if err := db.Where("user_id = ?", chatID).Find(&usedPromos).Error; err == nil {
+		if len(usedPromos) > 0 {
+			// Пользователь уже использовал специальную ссылку
+			msg := tgbotapi.NewMessage(chatID, "Вы уже использовали специальную ссылку.")
+			msg.ReplyMarkup = CreateQuickReplyMarkup()
+			bot.Send(msg)
+			return
+		}
+	}
+
+	if err := db.Where("code = ?", linkCode).First(&promo).Error; err != nil {
+		msg := tgbotapi.NewMessage(chatID, "Спец. ссылка не найдена.")
+		msg.ReplyMarkup = CreateQuickReplyMarkup()
+		bot.Send(msg)
+		return
+	}
+
+	if promo.Activations >= promo.MaxActivations {
+		msg := tgbotapi.NewMessage(chatID, "Эта спец. ссылка уже использована максимальное количество раз.")
+		msg.ReplyMarkup = CreateQuickReplyMarkup()
+		bot.Send(msg)
+		return
+	}
+
+	var usedPromo UsedPromoCode
+	if err := db.Where("user_id = ? AND promo_code = ?", chatID, linkCode).First(&usedPromo).Error; err == nil {
+		msg := tgbotapi.NewMessage(chatID, "Вы уже переходили по этой спец. ссылке.")
+		msg.ReplyMarkup = CreateQuickReplyMarkup()
+		bot.Send(msg)
+		return
+	}
+
+	rate, err := getCurrencyRate()
+	if err != nil {
+		log.Printf("Error getting currency rate: %v", err)
+
+		return
+	}
+	bonusInRubles := promo.Discount / rate
+
+	UpdateUserBalance(db, chatID, bonusInRubles)
+
+	promo.Activations++
+	db.Save(&promo)
+
+	newUsedPromo := UsedPromoCode{
+		UserID:    chatID,
+		PromoCode: linkCode,
+		Used:      true,
+	}
+	db.Create(&newUsedPromo)
 }

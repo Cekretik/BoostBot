@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/rand"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -29,7 +31,7 @@ func InitDB() (*gorm.DB, error) {
 		return nil, err
 	}
 
-	err = db.AutoMigrate(&UserState{}, &Category{}, &Subcategory{}, &Services{}, &UserOrders{}, &RefundedOrder{}, &Payments{}, &Referral{})
+	err = db.AutoMigrate(&UserState{}, &Category{}, &Subcategory{}, &Services{}, &UserOrders{}, &RefundedOrder{}, &Payments{}, &Referral{}, &PromoCode{}, &UsedPromoCode{})
 	if err != nil {
 		return nil, err
 	}
@@ -464,4 +466,46 @@ func getUserCurrency(db *gorm.DB, userID int64) (string, error) {
 
 func getCurrentCurrencyRate() float64 {
 	return currentRate
+}
+
+func generateUniquePromoCode(db *gorm.DB) (string, error) {
+	for {
+		promoCode := generateRandomCode(8)
+		var count int64
+		db.Model(&PromoCode{}).Where("code = ?", promoCode).Count(&count)
+		if count == 0 {
+			return promoCode, nil
+		}
+
+	}
+}
+
+func generateRandomCode(length int) string {
+	b := make([]byte, length)
+	_, err := rand.Read(b)
+	if err != nil {
+		log.Printf("Error generating random code: %v", err)
+	}
+	return fmt.Sprintf("%X", b)
+}
+
+func savePromoCode(db *gorm.DB, discount float64, maxActivations int64) (*PromoCode, error) {
+	promoCode, err := generateUniquePromoCode(db)
+	if err != nil {
+		return nil, err
+	}
+
+	newPromo := &PromoCode{
+		Code:           promoCode,
+		Discount:       discount,
+		MaxActivations: maxActivations,
+		Activations:    0,
+	}
+
+	result := db.Create(newPromo)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return newPromo, nil
 }

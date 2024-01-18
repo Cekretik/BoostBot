@@ -240,6 +240,7 @@ func createAndSendPaymentLink(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, a
 		inlineKeyboard := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonURL("Оплатить", paymentURL),
+				tgbotapi.NewInlineKeyboardButtonData("🎁Промокод", "promo"),
 			),
 		)
 		msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Для пополнения на сумму $%.4f нажмите на кнопку оплатить:", amount))
@@ -280,6 +281,7 @@ func createAndSendPaymentLinkPayOK(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int
 	inlineKeyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonURL("Оплатить", paymentURL),
+			tgbotapi.NewInlineKeyboardButtonData("🎁Промокод", "promo"),
 		),
 	)
 	msg := tgbotapi.NewMessage(chatID, paymentMessage)
@@ -347,6 +349,19 @@ func UpdateUserBalance(db *gorm.DB, userID int64, amount float64) error {
 		return err
 	}
 
+	var activePromoCode UsedPromoCode
+	if err := db.Where("user_id = ? AND used = ?", userID, false).First(&activePromoCode).Error; err == nil {
+		var promo PromoCode
+		if err := db.Where("code = ?", activePromoCode.PromoCode).First(&promo).Error; err == nil {
+			// Применение промокода
+			bonus := amount * promo.Discount / 100
+			amount += bonus
+
+			// Пометить промокод как использованный
+			db.Model(&UsedPromoCode{}).Where("user_id = ? AND promo_code = ?", userID, activePromoCode.PromoCode).Update("used", true)
+		}
+	}
+
 	user.Balance += amount
 	if err := db.Save(&user).Error; err != nil {
 		return err
@@ -360,7 +375,6 @@ func UpdateUserBalance(db *gorm.DB, userID int64, amount float64) error {
 	}
 	return nil
 }
-
 func isOrderExpired(userStatus *UserPaymentStatus) bool {
 	return userStatus.PaymentStatus == "cancel" || userStatus.PaymentStatus == "fail"
 }
