@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -48,12 +47,6 @@ func main() {
 		log.Panic(err)
 	}
 	itemsPerPage := 10
-
-	go func() {
-		if err := http.ListenAndServe(":8081", nil); err != nil {
-			log.Fatalf("Failed to start HTTP server: %v", err)
-		}
-	}()
 	go startHTTPServer(db)
 
 	for update := range updates {
@@ -73,13 +66,21 @@ func main() {
 				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
 			case "changeCurrencyToRUB":
 				handleChangeCurrency(bot, chatID, db, true)
+				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
 			case "changeCurrencyToUSD":
 				handleChangeCurrency(bot, chatID, db, false)
+				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
 			case "profile:favorites":
 				handleFavoritesCommand(bot, db, chatID)
 				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
 			case "promo":
 				handlePromoCommand(bot, chatID, db)
+				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
+			case "allorders":
+				handleOrdersCommand(bot, update.CallbackQuery.Message.Chat.ID, db)
+				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
+			case "settings":
+				sendSettingsKeyboard(bot, chatID)
 				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
 			}
 			if strings.HasPrefix(update.CallbackQuery.Data, "addFavorite:") || strings.HasPrefix(update.CallbackQuery.Data, "removeFavorite:") {
@@ -261,6 +262,9 @@ func main() {
 			} else if strings.HasPrefix(update.Message.Text, "/createurl") {
 				handleCreateUrlCommand(bot, update, db)
 				continue
+			} else if strings.HasPrefix(update.Message.Text, "/broadcast ") {
+				handleBroadcastCommand(bot, update, db)
+				continue
 			}
 			if userStatus, exists := userStatuses[chatID]; exists && userStatus.CurrentState != "" {
 				serviceID, err := strconv.Atoi(userStatus.PendingServiceID)
@@ -292,20 +296,14 @@ func main() {
 				if isSubscribed {
 					if update.Message.Text == "💳 Баланс" {
 						handleBalanceCommand(bot, update.Message.Chat.ID, db)
-					} else if update.Message.Text == "📝Мои заказы" {
-						handleOrdersCommand(bot, update.Message.Chat.ID, db)
 					} else if update.Message.Text == "⛑ Помощь" {
 						techSupMessage(bot, update.Message.Chat.ID)
 					} else if update.Message.Text == "🤝 Партнерам" {
 						ShowReferralStats(bot, db, update.Message.Chat.ID)
-					} else if update.Message.Text == "⚙️Настройки" {
-						sendSettingsKeyboard(bot, update.Message.Chat.ID)
 					} else if update.Message.Text == "✍️Сделать заказ" {
 						SendPromotionMessage(bot, update.Message.Chat.ID, db)
 					} else if update.Message.Text == "🧩Профиль" {
 						handleProfileCommand(bot, update.Message.Chat.ID, db)
-						// } else if update.Message.Text == "/createpromo" {
-						// 	handleCreatePromoCommand(bot, update, db)
 					} else {
 						SendPromotionMessage(bot, update.Message.Chat.ID, db)
 					}

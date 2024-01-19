@@ -1,9 +1,7 @@
 package main
 
 import (
-	"crypto/rand"
 	"errors"
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -167,7 +165,7 @@ func UpdateServicesInDB(db *gorm.DB, done chan bool) {
 		db.Find(&subcategories)
 
 		for _, subcategory := range subcategories {
-			services, err := fetchServicesFromAPI(subcategory.ID)
+			apiServices, err := fetchServicesFromAPI(subcategory.ID)
 			if err != nil {
 				log.Printf("Error fetching services from API for subcategory %s: %v", subcategory.Name, err)
 				continue
@@ -180,11 +178,23 @@ func UpdateServicesInDB(db *gorm.DB, done chan bool) {
 				}
 			}()
 
-			for _, service := range services {
+			// Список ID услуг из API для сравнения
+			apiServiceIDs := make(map[string]bool)
+			for _, service := range apiServices {
+				apiServiceIDs[service.ServiceID] = true
 				if err := updateService(tx, service); err != nil {
 					log.Printf("Error updating service with ID %s: %v", service.ServiceID, err)
 					tx.Rollback()
 					break
+				}
+			}
+
+			// Удаление услуг, которые есть в БД, но отсутствуют в API
+			var existingServices []Services
+			tx.Where("category_id = ?", subcategory.ID).Find(&existingServices)
+			for _, existingService := range existingServices {
+				if _, found := apiServiceIDs[existingService.ServiceID]; !found {
+					tx.Delete(&existingService)
 				}
 			}
 
@@ -424,7 +434,6 @@ func AddServiceToFavorites(db *gorm.DB, userID int64, serviceID int) error {
 		log.Printf("User not found with userID %d: %v", userID, err)
 		return err
 	}
-	log.Printf("skvazizambza %v", serviceID)
 	var service Services
 	if err := db.Where("id = ?", serviceID).First(&service).Error; err != nil {
 		log.Printf("Service not found with serviceID %d: %v", service.ID, err)
@@ -466,46 +475,4 @@ func getUserCurrency(db *gorm.DB, userID int64) (string, error) {
 
 func getCurrentCurrencyRate() float64 {
 	return currentRate
-}
-
-func generateUniquePromoCode(db *gorm.DB) (string, error) {
-	for {
-		promoCode := generateRandomCode(8)
-		var count int64
-		db.Model(&PromoCode{}).Where("code = ?", promoCode).Count(&count)
-		if count == 0 {
-			return promoCode, nil
-		}
-
-	}
-}
-
-func generateRandomCode(length int) string {
-	b := make([]byte, length)
-	_, err := rand.Read(b)
-	if err != nil {
-		log.Printf("Error generating random code: %v", err)
-	}
-	return fmt.Sprintf("%X", b)
-}
-
-func savePromoCode(db *gorm.DB, discount float64, maxActivations int64) (*PromoCode, error) {
-	promoCode, err := generateUniquePromoCode(db)
-	if err != nil {
-		return nil, err
-	}
-
-	newPromo := &PromoCode{
-		Code:           promoCode,
-		Discount:       discount,
-		MaxActivations: maxActivations,
-		Activations:    0,
-	}
-
-	result := db.Create(newPromo)
-	if result.Error != nil {
-		return nil, result.Error
-	}
-
-	return newPromo, nil
 }

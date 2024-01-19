@@ -16,17 +16,14 @@ var currentPage = ""
 
 func CreateQuickReplyMarkup() tgbotapi.ReplyKeyboardMarkup {
 	balanceButton := tgbotapi.NewKeyboardButton("💳 Баланс")
-	settingsButton := tgbotapi.NewKeyboardButton("⚙️Настройки")
-	ordersButton := tgbotapi.NewKeyboardButton("📝Мои заказы")
 	makeOrderButton := tgbotapi.NewKeyboardButton("✍️Сделать заказ")
 	makeTechSupButton := tgbotapi.NewKeyboardButton("⛑ Помощь")
 	makeReferralpButton := tgbotapi.NewKeyboardButton("🤝 Партнерам")
 	makeProfileButton := tgbotapi.NewKeyboardButton("🧩Профиль")
 	return tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(balanceButton, ordersButton),
-		tgbotapi.NewKeyboardButtonRow(makeOrderButton, makeTechSupButton),
-		tgbotapi.NewKeyboardButtonRow(makeProfileButton, makeReferralpButton),
-		tgbotapi.NewKeyboardButtonRow(settingsButton),
+		tgbotapi.NewKeyboardButtonRow(balanceButton, makeOrderButton),
+		tgbotapi.NewKeyboardButtonRow(makeTechSupButton, makeReferralpButton),
+		tgbotapi.NewKeyboardButtonRow(makeProfileButton),
 	)
 }
 
@@ -189,23 +186,30 @@ func SendPromotionMessage(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 
 func CreateCategoryKeyboard(db *gorm.DB) (tgbotapi.InlineKeyboardMarkup, error) {
 	var rows [][]tgbotapi.InlineKeyboardButton
-	var tempRow []tgbotapi.InlineKeyboardButton // Временный массив для хранения кнопок
+
+	categoryNames := []string{"Telegram", "YouTube", "Instagram", "TikTok", "Twitter"}
 
 	categories, err := GetCategoriesFromDB(db)
 	if err != nil {
 		return tgbotapi.InlineKeyboardMarkup{}, err
 	}
 
-	for i, category := range categories {
-		categoryNameWithEmoji := addEmojiToCategoryName(category.Name)
-		categoryButton := tgbotapi.NewInlineKeyboardButtonData(categoryNameWithEmoji, fmt.Sprintf("category:%s", category.ID))
+	categoryMap := make(map[string]Category)
+	for _, category := range categories {
+		categoryMap[category.Name] = category
+	}
 
-		tempRow = append(tempRow, categoryButton)
+	for i, name := range categoryNames {
+		if category, ok := categoryMap[name]; ok {
+			categoryNameWithEmoji := addEmojiToCategoryName(category.Name)
+			categoryButton := tgbotapi.NewInlineKeyboardButtonData(categoryNameWithEmoji, fmt.Sprintf("category:%s", category.ID))
 
-		// Добавляем строку в rows после каждой второй кнопки или если это последняя кнопка
-		if (i+1)%2 == 0 || i == len(categories)-1 {
-			rows = append(rows, tempRow)
-			tempRow = []tgbotapi.InlineKeyboardButton{} // Очищаем временный массив
+			if i == 0 || i%2 == 1 {
+				rows = append(rows, []tgbotapi.InlineKeyboardButton{categoryButton})
+			} else {
+				lastRowIndex := len(rows) - 1
+				rows[lastRowIndex] = append(rows[lastRowIndex], categoryButton)
+			}
 		}
 	}
 
@@ -388,7 +392,14 @@ func handleProfileCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	} else {
 		messageText = fmt.Sprintf("🤵‍♂️ Пользователь:%v\n 🔎 ID:%v\n 💳 Ваш баланс:$%.*f", userState.UserName, userState.UserID, decimalPlaces, balance)
 	}
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📝Мои заказы", "allorders"),
+			tgbotapi.NewInlineKeyboardButtonData("⚙️Настройки", "settings"),
+		),
+	)
 	msg := tgbotapi.NewMessage(chatID, messageText)
+	msg.ReplyMarkup = keyboard
 	bot.Send(msg)
 }
 
@@ -592,30 +603,34 @@ func handleCreatePromoCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *
 	}
 
 	args := strings.Split(update.Message.Text, " ")
-	if len(args) != 3 {
-		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Неверный формат. Используйте: /createpromo [скидка] [максимальное количество использований]"))
+
+	if len(args) != 4 {
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Неверный формат. Используйте: /createpromo [название] [скидка] [максимальное количество использований]"))
 		return
 	}
 
-	var discount float64
-	var maxActivations int64
-	var err error
-
-	discount, err = strconv.ParseFloat(args[1], 64)
+	promoName := args[1]
+	discount, err := strconv.ParseFloat(args[2], 64)
 	if err != nil || discount <= 0 {
 		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Неверный формат скидки."))
 		return
 	}
 
-	maxActivations, err = strconv.ParseInt(args[2], 10, 64)
+	maxActivations, err := strconv.ParseInt(args[3], 10, 64)
 	if err != nil || maxActivations <= 0 {
 		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Неверный формат количества использований."))
 		return
 	}
 
-	promo, err := savePromoCode(db, discount, maxActivations)
-	if err != nil {
-		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка при создании промокода."))
+	promo := PromoCode{
+		Code:           promoName,
+		Discount:       discount,
+		MaxActivations: maxActivations,
+		Activations:    0,
+	}
+
+	if err := db.Create(&promo).Error; err != nil {
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Промокод с таким названием уже существует."))
 		return
 	}
 
@@ -732,7 +747,8 @@ func processSpecialLink(bot *tgbotapi.BotAPI, chatID int64, linkCode string, db 
 	bonusInRubles := promo.Discount / rate
 
 	UpdateUserBalance(db, chatID, bonusInRubles)
-
+	congratulationMessage := fmt.Sprintf("🎁 Поздравляем, Вы активировали промокод!\n\n🌟 Ваш баланс пополнен на %.2fр", promo.Discount)
+	bot.Send(tgbotapi.NewMessage(chatID, congratulationMessage))
 	promo.Activations++
 	db.Save(&promo)
 
@@ -742,4 +758,36 @@ func processSpecialLink(bot *tgbotapi.BotAPI, chatID int64, linkCode string, db 
 		Used:      true,
 	}
 	db.Create(&newUsedPromo)
+}
+
+func handleBroadcastCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *gorm.DB) {
+	if !isAdmin(bot, int64(update.Message.From.ID)) {
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "У вас нет прав для выполнения этой команды."))
+		return
+	}
+
+	args := strings.Split(update.Message.Text, " ")
+	if len(args) < 2 {
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Пожалуйста, укажите сообщение для рассылки."))
+		return
+	}
+
+	message := strings.Join(args[1:], " ")
+	go broadcastMessage(bot, db, message)
+	bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Рассылка началась."))
+}
+
+func broadcastMessage(bot *tgbotapi.BotAPI, db *gorm.DB, message string) {
+	var users []UserState
+	db.Find(&users)
+
+	for _, user := range users {
+		msg := tgbotapi.NewMessage(user.UserID, message)
+		_, err := bot.Send(msg)
+		if err != nil {
+			log.Printf("Не удалось отправить сообщение пользователю с chat ID %d: %v", user.UserID, err)
+		}
+	}
+
+	log.Println("Рассылка завершена.")
 }
