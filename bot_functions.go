@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html"
 	"log"
 	"os"
 	"strconv"
@@ -766,23 +767,43 @@ func handleBroadcastCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *go
 		return
 	}
 
-	args := strings.Split(update.Message.Text, " ")
-	if len(args) < 2 {
+	parts := strings.SplitN(update.Message.Text, " ", 2)
+	if len(parts) < 2 || len(parts[1]) == 0 {
 		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Пожалуйста, укажите сообщение для рассылки."))
 		return
 	}
 
-	message := strings.Join(args[1:], " ")
-	go broadcastMessage(bot, db, message)
+	// Используйте только текст после команды /broadcast
+	message := parts[1]
+
+	var entities []Entity
+	if update.Message.Entities != nil && len(*update.Message.Entities) > 0 {
+		shiftedEntities := make([]tgbotapi.MessageEntity, len(*update.Message.Entities))
+		for i, entity := range *update.Message.Entities {
+			if entity.Offset >= len(parts[0]) {
+				shiftedEntities[i] = entity
+				shiftedEntities[i].Offset -= len(parts[0]) + 1
+			}
+		}
+		entities = convertEntities(shiftedEntities)
+	}
+
+	formattedMessage, err := formatBroadcastMessage(message, entities)
+	if err != nil {
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка форматирования сообщения: "+err.Error()))
+		return
+	}
+
+	go broadcastMessage(bot, db, formattedMessage)
 	bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Рассылка началась."))
 }
-
 func broadcastMessage(bot *tgbotapi.BotAPI, db *gorm.DB, message string) {
 	var users []UserState
 	db.Find(&users)
 
 	for _, user := range users {
 		msg := tgbotapi.NewMessage(user.UserID, message)
+		msg.ParseMode = tgbotapi.ModeHTML
 		_, err := bot.Send(msg)
 		if err != nil {
 			log.Printf("Не удалось отправить сообщение пользователю с chat ID %d: %v", user.UserID, err)
@@ -790,4 +811,69 @@ func broadcastMessage(bot *tgbotapi.BotAPI, db *gorm.DB, message string) {
 	}
 
 	log.Println("Рассылка завершена.")
+}
+
+func formatBroadcastMessage(message string, entities []Entity) (string, error) {
+	var formattedMessage strings.Builder
+
+	lastIdx := 0
+	for _, entity := range entities {
+		if entity.Offset < lastIdx || entity.Offset+entity.Length > len(message) {
+			return "", fmt.Errorf("некорректные границы сущности: Offset=%d, Length=%d, lastIdx=%d, messageLength=%d",
+				entity.Offset, entity.Length, lastIdx, len(message))
+		}
+
+		formattedMessage.WriteString(html.EscapeString(message[lastIdx:entity.Offset]))
+
+		entityText := html.EscapeString(message[entity.Offset : entity.Offset+entity.Length])
+
+		switch entity.Type {
+		case "bold":
+			formattedMessage.WriteString("<b>" + entityText + "</b>")
+		case "italic":
+			formattedMessage.WriteString("<i>" + entityText + "</i>")
+		case "code":
+			formattedMessage.WriteString("<code>" + entityText + "</code>")
+		case "pre":
+			formattedMessage.WriteString("<pre>" + entityText + "</pre>")
+		case "text_link":
+			formattedMessage.WriteString("<a href=\"" + entity.URL + "\">" + entityText + "</a>")
+		case "underline":
+			formattedMessage.WriteString("<u>" + entityText + "</u>")
+		case "strikethrough":
+			formattedMessage.WriteString("<s>" + entityText + "</s>")
+		case "spoiler":
+			formattedMessage.WriteString("<tg-spoiler>" + entityText + "</tg-spoiler>")
+		case "blockquote":
+			formattedMessage.WriteString("<blockquote>" + entityText + "</blockquote>")
+		default:
+			formattedMessage.WriteString(entityText)
+		}
+
+		lastIdx = entity.Offset + entity.Length
+	}
+
+	formattedMessage.WriteString(html.EscapeString(message[lastIdx:]))
+
+	return formattedMessage.String(), nil
+}
+
+func convertEntities(tgEntities []tgbotapi.MessageEntity) []Entity {
+	var entities []Entity
+	for _, e := range tgEntities {
+		entities = append(entities, Entity{
+			Type:   e.Type,
+			URL:    e.URL,
+			Offset: e.Offset,
+			Length: e.Length,
+		})
+	}
+	return entities
+}
+
+type Entity struct {
+	Type   string
+	URL    string
+	Offset int
+	Length int
 }
