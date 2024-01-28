@@ -116,6 +116,7 @@ type PromoCode struct {
 	Discount       float64 `gorm:"column:discount"`
 	MaxActivations int64   `gorm:"column:max_activations"`
 	Activations    int64   `gorm:"column:activations"`
+	Type           string  `gorm:"column:type"`
 }
 
 type UsedPromoCode struct {

@@ -111,7 +111,7 @@ func UpdateCategoriesInDB(db *gorm.DB, done chan bool) {
 			if err := tx.Commit().Error; err != nil {
 				log.Printf("Error committing transaction for categories: %v", err)
 			} else {
-				log.Println("Categories updated in the database.")
+				//log.Println("Categories updated in the database.")
 				done <- true
 			}
 		}
@@ -150,8 +150,6 @@ func UpdateSubcategoriesInDB(db *gorm.DB, done chan bool) {
 
 			if err := tx.Commit().Error; err != nil {
 				log.Printf("Error committing transaction for subcategories in category %s: %v", category.Name, err)
-			} else {
-				log.Printf("Subcategories updated in the database for category %s.", category.Name)
 			}
 		}
 
@@ -200,8 +198,6 @@ func UpdateServicesInDB(db *gorm.DB, done chan bool) {
 
 			if err := tx.Commit().Error; err != nil {
 				log.Printf("Error committing transaction for subcategory %s: %v", subcategory.Name, err)
-			} else {
-				log.Printf("Services updated in the database for subcategory %s.", subcategory.Name)
 			}
 		}
 

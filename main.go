@@ -229,7 +229,6 @@ func main() {
 					param := args[1]
 					// Проверяем, является ли параметр специальной ссылкой
 					if strings.Contains(param, "_") {
-						// Обработка специальной ссылки
 						processSpecialLink(bot, update.Message.Chat.ID, param, db)
 					} else {
 						// Обработка реферального ID
@@ -305,6 +304,7 @@ func main() {
 					} else if update.Message.Text == "🧩Профиль" {
 						handleProfileCommand(bot, update.Message.Chat.ID, db)
 					} else {
+						log.Printf("dwadwa %v", userPaymentStatus)
 						SendPromotionMessage(bot, update.Message.Chat.ID, db)
 					}
 				} else {

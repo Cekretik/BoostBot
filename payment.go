@@ -94,6 +94,7 @@ func handleReplenishCommand(bot *tgbotapi.BotAPI, chatID int64) {
 func handleCryptomusButton(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	userPaymentStatus := updateUserStatus(chatID)
 	userPaymentStatus.CurrentState = "awaitingAmount"
+	log.Printf("chuba %v", userPaymentStatus)
 	userPaymentStatus.OrderID = createOrderID(chatID+44984985, time.Now().Unix())
 
 	var user UserState

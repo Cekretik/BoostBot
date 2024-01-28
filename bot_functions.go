@@ -582,10 +582,24 @@ func processPromoCodeInput(bot *tgbotapi.BotAPI, chatID int64, promoCode string,
 		bot.Send(msg)
 		return
 	}
-
+	rate, err := getCurrencyRate()
+	if err != nil {
+		log.Printf("Error getting currency rate: %v", err)
+		return
+	}
+	bonusInRubles := promo.Discount / rate
+	switch promo.Type {
+	case "fixed":
+		UpdateUserBalance(db, chatID, bonusInRubles)
+		congratulationMessage := fmt.Sprintf("🎁 Поздравляем, Вы активировали промокод!\n\n🌟 Ваш баланс пополнен на %.2fр", promo.Discount)
+		bot.Send(tgbotapi.NewMessage(chatID, congratulationMessage))
+	default:
+		bot.Send(tgbotapi.NewMessage(chatID, "Чел тыы кто"))
+	}
 	newUsedPromo := UsedPromoCode{
 		UserID:    chatID,
 		PromoCode: promoCode,
+		Used:      true,
 	}
 	db.Create(&newUsedPromo)
 
@@ -628,6 +642,7 @@ func handleCreatePromoCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *
 		Discount:       discount,
 		MaxActivations: maxActivations,
 		Activations:    0,
+		Type:           "discount",
 	}
 
 	if err := db.Create(&promo).Error; err != nil {
@@ -689,33 +704,29 @@ func handleCreateUrlCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *go
 		return
 	}
 
-	linkCode := GenerateSpecialLink(linkName, amountStr, maxClicksStr)
+	linkCode := GenerateSpecialLink(linkName)
+	var existingPromo PromoCode
+	if db.Where("code = ?", linkCode).First(&existingPromo).Error == nil {
+		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Ссылка с таким названием уже была создана ранее."))
+		return
+	}
 	promo := PromoCode{
 		Code:           linkCode,
 		Discount:       amount,
 		MaxActivations: maxClicks,
 		Activations:    0,
+		Type:           "fixed",
 	}
 	db.Create(&promo)
 	specialLink := fmt.Sprintf(botLink+"?start=%s", linkCode)
 	bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Ссылка создана: %s", specialLink)))
 }
 
-func GenerateSpecialLink(linkName, amount, maxClicks string) string {
-	return fmt.Sprintf("%s_%s_%s", linkName, amount, maxClicks)
+func GenerateSpecialLink(linkName string) string {
+	return fmt.Sprint(linkName) + "_"
 }
 func processSpecialLink(bot *tgbotapi.BotAPI, chatID int64, linkCode string, db *gorm.DB) {
 	var promo PromoCode
-	var usedPromos []UsedPromoCode
-	if err := db.Where("user_id = ?", chatID).Find(&usedPromos).Error; err == nil {
-		if len(usedPromos) > 0 {
-			// Пользователь уже использовал специальную ссылку
-			msg := tgbotapi.NewMessage(chatID, "Вы уже использовали специальную ссылку.")
-			msg.ReplyMarkup = CreateQuickReplyMarkup()
-			bot.Send(msg)
-			return
-		}
-	}
 
 	if err := db.Where("code = ?", linkCode).First(&promo).Error; err != nil {
 		msg := tgbotapi.NewMessage(chatID, "Спец. ссылка не найдена.")
@@ -742,7 +753,6 @@ func processSpecialLink(bot *tgbotapi.BotAPI, chatID int64, linkCode string, db 
 	rate, err := getCurrencyRate()
 	if err != nil {
 		log.Printf("Error getting currency rate: %v", err)
-
 		return
 	}
 	bonusInRubles := promo.Discount / rate
