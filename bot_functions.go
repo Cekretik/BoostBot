@@ -593,8 +593,6 @@ func processPromoCodeInput(bot *tgbotapi.BotAPI, chatID int64, promoCode string,
 		UpdateUserBalance(db, chatID, bonusInRubles)
 		congratulationMessage := fmt.Sprintf("🎁 Поздравляем, Вы активировали промокод!\n\n🌟 Ваш баланс пополнен на %.2fр", promo.Discount)
 		bot.Send(tgbotapi.NewMessage(chatID, congratulationMessage))
-	default:
-		bot.Send(tgbotapi.NewMessage(chatID, "Чел тыы кто"))
 	}
 	newUsedPromo := UsedPromoCode{
 		UserID:    chatID,

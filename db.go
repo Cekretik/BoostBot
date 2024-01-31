@@ -127,29 +127,27 @@ func UpdateSubcategoriesInDB(db *gorm.DB, done chan bool) {
 		db.Find(&categories)
 
 		for _, category := range categories {
-			subcategories, err := fetchSubcategoriesFromAPI(category.ID)
+			apiSubcategories, err := fetchSubcategoriesFromAPI(category.ID)
 			if err != nil {
 				log.Printf("Error fetching subcategories from API for category %s: %v", category.Name, err)
 				continue
 			}
 
-			tx := db.Begin()
-			defer func() {
-				if r := recover(); r != nil {
-					tx.Rollback()
-				}
-			}()
-
-			for _, subcategory := range subcategories {
-				if err := updateSubcategory(tx, subcategory); err != nil {
+			apiSubcategoryIDs := make(map[string]bool)
+			for _, subcategory := range apiSubcategories {
+				apiSubcategoryIDs[subcategory.ID] = true
+				if err := updateSubcategory(db, subcategory); err != nil {
 					log.Printf("Error updating subcategory with ID %s: %v", subcategory.ID, err)
-					tx.Rollback()
-					break
 				}
 			}
 
-			if err := tx.Commit().Error; err != nil {
-				log.Printf("Error committing transaction for subcategories in category %s: %v", category.Name, err)
+			// Удаление подкатегорий, которые есть в БД, но отсутствуют в API
+			var existingSubcategories []Subcategory
+			db.Where("category_id = ?", category.ID).Find(&existingSubcategories)
+			for _, existingSubcategory := range existingSubcategories {
+				if _, found := apiSubcategoryIDs[existingSubcategory.ID]; !found {
+					db.Delete(&existingSubcategory)
+				}
 			}
 		}
 
@@ -351,7 +349,6 @@ func updateOrdersPeriodically(db *gorm.DB, done chan bool) {
 		for _, detail := range serviceDetails {
 			var order UserOrders
 			if err := tx.Where("order_id = ?", detail.ID).First(&order).Error; err != nil {
-				log.Printf("Error finding order with ID %d: %v", detail.ID, err)
 				continue
 			}
 
@@ -403,10 +400,7 @@ func updateOrdersPeriodically(db *gorm.DB, done chan bool) {
 		if err := tx.Commit().Error; err != nil {
 			log.Printf("Error committing transaction for updating orders: %v", err)
 			tx.Rollback()
-		} else {
-			log.Println("User orders updated in the database.")
 		}
-
 		select {
 		case <-done:
 			return
