@@ -82,6 +82,10 @@ func main() {
 			case "settings":
 				sendSettingsKeyboard(bot, chatID)
 				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
+			case "techsup":
+				techSupMessage(bot, chatID)
+				bot.AnswerCallbackQuery(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
+
 			}
 			if strings.HasPrefix(update.CallbackQuery.Data, "addFavorite:") || strings.HasPrefix(update.CallbackQuery.Data, "removeFavorite:") {
 				handleAddToFavoritesCallback(bot, db, update.CallbackQuery)
@@ -295,14 +299,14 @@ func main() {
 				if isSubscribed {
 					if update.Message.Text == "💳 Баланс" {
 						handleBalanceCommand(bot, update.Message.Chat.ID, db)
-					} else if update.Message.Text == "⛑ Помощь" {
-						techSupMessage(bot, update.Message.Chat.ID)
 					} else if update.Message.Text == "🤝 Партнерам" {
 						ShowReferralStats(bot, db, update.Message.Chat.ID)
 					} else if update.Message.Text == "✍️Сделать заказ" {
 						SendPromotionMessage(bot, update.Message.Chat.ID, db)
 					} else if update.Message.Text == "🧩Профиль" {
 						handleProfileCommand(bot, update.Message.Chat.ID, db)
+					} else if update.Message.Text == "⚡️Сайт (-55%)" {
+						SendSiteMessage(bot, update.Message.Chat.ID)
 					} else {
 						log.Printf("dwadwa %v", userPaymentStatus)
 						SendPromotionMessage(bot, update.Message.Chat.ID, db)

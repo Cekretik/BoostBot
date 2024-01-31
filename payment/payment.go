@@ -55,100 +55,6 @@ type CryptomusWebhookData struct {
 	Sign string `json:"sign"`
 }
 
-func handleReplenishCommand(bot *tgbotapi.BotAPI, chatID int64) {
-	userPaymentStatus := updateUserStatus(chatID)
-	userPaymentStatus.CurrentState = "awaitingPaymentSystem"
-
-	msgText := ("Выберите платежную систему")
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("СБП|RUB", "payok_SBP"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("RU Карта|RUB", "payok_RU"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("USDT", "cryptomus_USDT"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("BTC", "cryptomus_BTC"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("MATIC", "cryptomus_MATIC"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Другая Крипта", "cryptomus_OTHER"),
-		),
-	)
-	cancelKeyboard := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("Отмена"),
-		),
-	)
-	msg := tgbotapi.NewMessage(chatID, msgText)
-	msg.ReplyMarkup = cancelKeyboard
-	msg.ReplyMarkup = keyboard
-	bot.Send(msg)
-}
-
-func handleCryptomusButton(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
-	userPaymentStatus := updateUserStatus(chatID)
-	userPaymentStatus.CurrentState = "awaitingAmount"
-	log.Printf("chuba %v", userPaymentStatus)
-	userPaymentStatus.OrderID = createOrderID(chatID+44984985, time.Now().Unix())
-
-	var user UserState
-	if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {
-		log.Printf("Error fetching user state: %v", err)
-		bot.Send(tgbotapi.NewMessage(chatID, "Произошла ошибка."))
-		return
-	}
-
-	msgText := "Введите желаемую сумму в долларах."
-	if user.Currency == "RUB" {
-		msgText = "Введите желаемую сумму в рублях."
-	}
-
-	cancelKeyboard := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("Отмена"),
-		),
-	)
-
-	msg := tgbotapi.NewMessage(chatID, msgText)
-	msg.ReplyMarkup = cancelKeyboard
-	bot.Send(msg)
-}
-
-func handlePayOKButton(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
-	userPaymentStatus := updateUserStatus(chatID)
-	userPaymentStatus.CurrentState = "awaitingAmountPayOK"
-	paymentID := createPaymentID(chatID, time.Now().Unix())
-	userPaymentStatus.OrderID = paymentID
-
-	var user UserState
-	if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {
-		log.Printf("Error fetching user state: %v", err)
-		bot.Send(tgbotapi.NewMessage(chatID, "Произошла ошибка."))
-		return
-	}
-
-	msgText := "Введите желаемую сумму в долларах."
-	if user.Currency == "RUB" {
-		msgText = "Введите желаемую сумму в рублях."
-	}
-
-	cancelKeyboard := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("Отмена"),
-		),
-	)
-
-	msg := tgbotapi.NewMessage(chatID, msgText)
-	msg.ReplyMarkup = cancelKeyboard
-	bot.Send(msg)
-	userPaymentStatuses[chatID] = userPaymentStatus
-}
 func handlePaymentInput(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amountText string) {
 	userPaymentStatus := updateUserStatus(chatID)
 
@@ -387,15 +293,13 @@ func handleCreatePayment(w http.ResponseWriter, r *http.Request, db *gorm.DB) {
 		return
 	}
 
-	// Создание платежа
-	orderID := createOrderID(req.ChatID, time.Now().Unix()) // функция для генерации OrderID
+	orderID := createOrderID(req.ChatID, time.Now().Unix())
 	paymentResponse, err := CreatePayment(strconv.FormatFloat(req.Amount, 'f', 2, 64), req.Currency, orderID)
 	if err != nil {
 		http.Error(w, "Failed to create payment", http.StatusInternalServerError)
 		return
 	}
 
-	// Сохранение информации о платеже в БД
 	newPayment := Payments{
 		ChatID:  int(req.ChatID),
 		OrderID: orderID,
@@ -406,7 +310,6 @@ func handleCreatePayment(w http.ResponseWriter, r *http.Request, db *gorm.DB) {
 	}
 	db.Create(&newPayment)
 
-	// Отправка ответа
 	response := map[string]string{
 		"url":    paymentResponse.Result.PaymentURL,
 		"status": "success",
@@ -420,10 +323,8 @@ func handleCreatePaymentPayOK(w http.ResponseWriter, r *http.Request, db *gorm.D
 		return
 	}
 
-	// Генерация уникального paymentID для платежа
 	paymentID := createPaymentID(req.ChatID, time.Now().Unix())
 
-	// Создание платежа через PayOK
 	amountFormatted := fmt.Sprintf("%.2f", req.Amount)
 	paymentURL, err := CreatePayOKPayment(amountFormatted, paymentID, req.Currency, "Описание платежа")
 	if err != nil {
@@ -431,10 +332,9 @@ func handleCreatePaymentPayOK(w http.ResponseWriter, r *http.Request, db *gorm.D
 		return
 	}
 
-	// Сохранение информации о платеже в БД
 	newPayment := Payments{
 		ChatID:  int(req.ChatID),
-		OrderID: paymentID, // Здесь используется paymentID от PayOK
+		OrderID: paymentID,
 		Amount:  req.Amount,
 		Url:     paymentURL,
 		Status:  "pending",

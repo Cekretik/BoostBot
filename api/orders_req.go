@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"bytes"
@@ -17,13 +17,16 @@ import (
 var apiOrdersEndpoint string
 var token string
 
+type RatesResponse struct {
+	RUB float64 `json:"RUB"`
+}
+
+var currentRate float64
+
 func init() {
-	// Загрузка переменных окружения
 	if err := godotenv.Load(); err != nil {
 		log.Fatal("Error loading .env file")
 	}
-
-	// Инициализация глобальных переменных
 	apiOrdersEndpoint = os.Getenv("API_ORDERS_ENDPOINT")
 	token = os.Getenv("STAGESMM_TOKEN")
 }
@@ -113,12 +116,6 @@ func createOrder(order Order, token string) (UserOrders, error) {
 
 	return responseOrder, nil
 }
-
-type RatesResponse struct {
-	RUB float64 `json:"RUB"`
-}
-
-var currentRate float64
 
 func getCurrencyRate() (float64, error) {
 	client := &http.Client{}
