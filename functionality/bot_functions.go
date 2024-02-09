@@ -7,13 +7,14 @@ import (
 	"strconv"
 
 	"github.com/Cekretik/BoostBot/api"
-	"github.com/Cekretik/BoostBot/cmd"
 	"github.com/Cekretik/BoostBot/database"
 	"github.com/Cekretik/BoostBot/models"
 	tgbotapi "github.com/Cekretik/telegram-bot-api-master"
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 )
+
+var DecimalPlaces = 4
 
 func convertAmount(amount float64, rate float64, toRUB bool) float64 {
 	if toRUB {
@@ -58,9 +59,9 @@ func handleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
 
 	if userState.Currency == "RUB" {
 		balance = convertAmount(balance, rate, true)
-		balanceMsgText = fmt.Sprintf("💳 Ваш баланс: ₽%.*f", cmd.DecimalPlaces, balance)
+		balanceMsgText = fmt.Sprintf("💳 Ваш баланс: ₽%.*f", DecimalPlaces, balance)
 	} else {
-		balanceMsgText = fmt.Sprintf("💳 Ваш баланс: $%.*f", cmd.DecimalPlaces, balance)
+		balanceMsgText = fmt.Sprintf("💳 Ваш баланс: $%.*f", DecimalPlaces, balance)
 	}
 
 	msg := tgbotapi.NewMessage(userID, balanceMsgText)
@@ -93,9 +94,9 @@ func handleProfileCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	var messageText string
 	if userState.Currency == "RUB" {
 		balance = convertAmount(balance, rate, true)
-		messageText = fmt.Sprintf("🤵‍♂️ Пользователь:%v\n 🔎 ID:%v\n 💳 Ваш баланс:₽%.*f", userState.UserName, userState.UserID, main.DecimalPlaces, balance)
+		messageText = fmt.Sprintf("🤵‍♂️ Пользователь:%v\n 🔎 ID:%v\n 💳 Ваш баланс:₽%.*f", userState.UserName, userState.UserID, DecimalPlaces, balance)
 	} else {
-		messageText = fmt.Sprintf("🤵‍♂️ Пользователь:%v\n 🔎 ID:%v\n 💳 Ваш баланс:$%.*f", userState.UserName, userState.UserID, main.DecimalPlaces, balance)
+		messageText = fmt.Sprintf("🤵‍♂️ Пользователь:%v\n 🔎 ID:%v\n 💳 Ваш баланс:$%.*f", userState.UserName, userState.UserID, DecimalPlaces, balance)
 	}
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
@@ -236,7 +237,7 @@ func FormatServiceInfo(service models.Services, subcategory models.Subcategory, 
 				"💸 Цена за 1000: %s%.*f\n\n"+
 				"📉 Минимальное количество: %d\n"+
 				"📈 Максимальное количество: %d",
-			service.ID, service.Name, subcategory.Name, currencySymbol, cmd.DecimalPlaces, increasedRate, service.Min, service.Max)
+			service.ID, service.Name, subcategory.Name, currencySymbol, DecimalPlaces, increasedRate, service.Min, service.Max)
 	} else {
 		currencySymbol := "$"
 		return fmt.Sprintf(
@@ -247,6 +248,6 @@ func FormatServiceInfo(service models.Services, subcategory models.Subcategory, 
 				"💸 Цена за 1000: %s%.*f\n\n"+
 				"📉 Минимальное количество: %d\n"+
 				"📈 Максимальное количество: %d",
-			service.ID, service.Name, subcategory.Name, currencySymbol, cmd.DecimalPlaces, increasedRate, service.Min, service.Max)
+			service.ID, service.Name, subcategory.Name, currencySymbol, DecimalPlaces, increasedRate, service.Min, service.Max)
 	}
 }

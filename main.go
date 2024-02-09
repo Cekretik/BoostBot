@@ -10,8 +10,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var DecimalPlaces = 4
-
 func main() {
 	err := godotenv.Load()
 	if err != nil {

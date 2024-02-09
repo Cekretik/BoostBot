@@ -9,6 +9,9 @@ import (
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 
+	"github.com/Cekretik/BoostBot/callbacks"
+	"github.com/Cekretik/BoostBot/database"
+	"github.com/Cekretik/BoostBot/models"
 	tgbotapi "github.com/Cekretik/telegram-bot-api-master"
 )
 
@@ -130,7 +133,7 @@ func SendSiteMessage(bot *tgbotapi.BotAPI, chatID int64) {
 }
 
 func SendPromotionMessage(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
-	var userState UserState
+	var userState models.UserState
 	err := db.Where("user_id = ?", chatID).First(&userState).Error
 	if err != nil {
 		log.Println("Error getting user state:", err)
@@ -146,7 +149,7 @@ func SendPromotionMessage(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	}
 	categoryID := ""
 
-	totalPages, err := database.GetTotalPagesForCategory(db, callbacks.itemsPerPage, categoryID)
+	totalPages, err := callbacks.GetTotalPagesForCategory(db, callbacks.ItemsPerPage, categoryID)
 	if err != nil {
 		log.Println("Error getting total pages:", err)
 		return
@@ -187,13 +190,13 @@ func SendPromotionMessage(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	}
 
 	subcategoryID := ""
-	totalServicePages, err := GetTotalPagesForService(db, itemsPerPage, categoryID)
+	totalServicePages, err := callbacks.GetTotalPagesForService(db, callbacks.ItemsPerPage, categoryID)
 	if err != nil {
 		log.Println("Error getting total pages:", err)
 		return
 	}
 
-	services, err := GetServicesBySubcategoryID(db, subcategoryID)
+	services, err := callbacks.GetServicesBySubcategoryID(db, subcategoryID)
 	if err != nil {
 		log.Println("Error getting services:", err)
 		return
@@ -254,12 +257,12 @@ func CreateCategoryKeyboard(db *gorm.DB) (tgbotapi.InlineKeyboardMarkup, error) 
 func CreateSubcategoryKeyboard(db *gorm.DB, categoryID, currentPage, totalPages string) (tgbotapi.InlineKeyboardMarkup, error) {
 	var rows [][]tgbotapi.InlineKeyboardButton
 
-	subcategories, err := GetSubcategoriesByCategoryID(db, categoryID)
+	subcategories, err := database.GetSubcategoriesByCategoryID(db, categoryID)
 	if err != nil {
 		return tgbotapi.InlineKeyboardMarkup{}, err
 	}
 
-	startIdx, endIdx := calculatePageRange(len(subcategories), itemsPerPage, currentPage)
+	startIdx, endIdx := callbacks.calculatePageRange(len(subcategories), callbacks.itemsPerPage, currentPage)
 
 	for i := startIdx; i < endIdx; i++ {
 		subcategory := subcategories[i]
@@ -278,7 +281,7 @@ func CreateSubcategoryKeyboard(db *gorm.DB, categoryID, currentPage, totalPages 
 		return tgbotapi.InlineKeyboardMarkup{}, err
 	}
 
-	paginationRow := createPaginationRow(categoryID, currentPageInt, totalPagesInt)
+	paginationRow := callbacks.createPaginationRow(categoryID, currentPageInt, totalPagesInt)
 	rows = append(rows, paginationRow)
 
 	return tgbotapi.NewInlineKeyboardMarkup(rows...), nil
@@ -287,12 +290,12 @@ func CreateSubcategoryKeyboard(db *gorm.DB, categoryID, currentPage, totalPages 
 func CreateServiceKeyboard(db *gorm.DB, subcategoryID, currentPage, totalServicePages string) (tgbotapi.InlineKeyboardMarkup, error) {
 	var rows [][]tgbotapi.InlineKeyboardButton
 
-	services, err := GetServicesBySubcategoryID(db, subcategoryID)
+	services, err := database.GetServicesBySubcategoryID(db, subcategoryID)
 	if err != nil {
 		return tgbotapi.InlineKeyboardMarkup{}, err
 	}
 
-	startIdx, endIdx := calculatePageRange(len(services), itemsPerPage, currentPage)
+	startIdx, endIdx := callbacks.calculatePageRange(len(services), callbacks.itemsPerPage, currentPage)
 
 	for i := startIdx; i < endIdx; i++ {
 		service := services[i]
@@ -313,7 +316,7 @@ func CreateServiceKeyboard(db *gorm.DB, subcategoryID, currentPage, totalService
 	}
 	backToSubcategoriesButton := tgbotapi.NewInlineKeyboardButtonData("🔙 Вернуться к категориям", fmt.Sprintf("backToSubcategories:%s", subcategoryID))
 	rows = append(rows, []tgbotapi.InlineKeyboardButton{backToSubcategoriesButton})
-	paginationRow := createServicePaginationRow(subcategoryID, currentPageInt, totalServicePagesInt)
+	paginationRow := callbacks.createServicePaginationRow(subcategoryID, currentPageInt, totalServicePagesInt)
 	rows = append(rows, paginationRow)
 
 	return tgbotapi.NewInlineKeyboardMarkup(rows...), nil
