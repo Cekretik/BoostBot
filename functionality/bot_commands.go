@@ -8,6 +8,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Cekretik/BoostBot/api"
+	"github.com/Cekretik/BoostBot/database"
+	"github.com/Cekretik/BoostBot/models"
 	tgbotapi "github.com/Cekretik/telegram-bot-api-master"
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
@@ -63,7 +66,7 @@ func processPromoCodeInput(bot *tgbotapi.BotAPI, chatID int64, promoCode string,
 		return
 	}
 
-	var promo PromoCode
+	var promo models.PromoCode
 	if err := db.Where("code = ?", promoCode).First(&promo).Error; err != nil {
 		msg := tgbotapi.NewMessage(chatID, "Промокод не найден.")
 		msg.ReplyMarkup = CreateQuickReplyMarkup()
@@ -77,14 +80,14 @@ func processPromoCodeInput(bot *tgbotapi.BotAPI, chatID int64, promoCode string,
 		return
 	}
 
-	var usedPromo UsedPromoCode
+	var usedPromo models.UsedPromoCode
 	if err := db.Where("user_id = ? AND promo_code = ?", chatID, promoCode).First(&usedPromo).Error; err == nil {
 		msg := tgbotapi.NewMessage(chatID, "Вы уже использовали этот промокод.")
 		msg.ReplyMarkup = CreateQuickReplyMarkup()
 		bot.Send(msg)
 		return
 	}
-	rate, err := getCurrencyRate()
+	rate, err := api.GetCurrencyRate()
 	if err != nil {
 		log.Printf("Error getting currency rate: %v", err)
 		return
@@ -92,11 +95,11 @@ func processPromoCodeInput(bot *tgbotapi.BotAPI, chatID int64, promoCode string,
 	bonusInRubles := promo.Discount / rate
 	switch promo.Type {
 	case "fixed":
-		UpdateUserBalance(db, chatID, bonusInRubles)
+		database.UpdateUserBalance(db, chatID, bonusInRubles)
 		congratulationMessage := fmt.Sprintf("🎁 Поздравляем, Вы активировали промокод!\n\n🌟 Ваш баланс пополнен на %.2fр", promo.Discount)
 		bot.Send(tgbotapi.NewMessage(chatID, congratulationMessage))
 	}
-	newUsedPromo := UsedPromoCode{
+	newUsedPromo := models.UsedPromoCode{
 		UserID:    chatID,
 		PromoCode: promoCode,
 		Used:      true,
@@ -137,7 +140,7 @@ func handleCreatePromoCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *
 		return
 	}
 
-	promo := PromoCode{
+	promo := models.PromoCode{
 		Code:           promoName,
 		Discount:       discount,
 		MaxActivations: maxActivations,
@@ -208,12 +211,12 @@ func handleCreateUrlCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *go
 	}
 
 	linkCode := GenerateSpecialLink(linkName)
-	var existingPromo PromoCode
+	var existingPromo models.PromoCode
 	if db.Where("code = ?", linkCode).First(&existingPromo).Error == nil {
 		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Ссылка с таким названием уже была создана ранее."))
 		return
 	}
-	promo := PromoCode{
+	promo := models.PromoCode{
 		Code:           linkCode,
 		Discount:       amount,
 		MaxActivations: maxClicks,
@@ -229,7 +232,7 @@ func GenerateSpecialLink(linkName string) string {
 	return fmt.Sprint(linkName) + "_"
 }
 func processSpecialLink(bot *tgbotapi.BotAPI, chatID int64, linkCode string, db *gorm.DB) {
-	var promo PromoCode
+	var promo models.PromoCode
 
 	if err := db.Where("code = ?", linkCode).First(&promo).Error; err != nil {
 		msg := tgbotapi.NewMessage(chatID, "Спец. ссылка не найдена.")
@@ -245,7 +248,7 @@ func processSpecialLink(bot *tgbotapi.BotAPI, chatID int64, linkCode string, db 
 		return
 	}
 
-	var usedPromo UsedPromoCode
+	var usedPromo models.UsedPromoCode
 	if err := db.Where("user_id = ? AND promo_code = ?", chatID, linkCode).First(&usedPromo).Error; err == nil {
 		msg := tgbotapi.NewMessage(chatID, "Вы уже переходили по этой спец. ссылке.")
 		msg.ReplyMarkup = CreateQuickReplyMarkup()
@@ -253,20 +256,20 @@ func processSpecialLink(bot *tgbotapi.BotAPI, chatID int64, linkCode string, db 
 		return
 	}
 
-	rate, err := getCurrencyRate()
+	rate, err := api.GetCurrencyRate()
 	if err != nil {
 		log.Printf("Error getting currency rate: %v", err)
 		return
 	}
 	bonusInRubles := promo.Discount / rate
 
-	UpdateUserBalance(db, chatID, bonusInRubles)
+	database.UpdateUserBalance(db, chatID, bonusInRubles)
 	congratulationMessage := fmt.Sprintf("🎁 Поздравляем, Вы активировали промокод!\n\n🌟 Ваш баланс пополнен на %.2fр", promo.Discount)
 	bot.Send(tgbotapi.NewMessage(chatID, congratulationMessage))
 	promo.Activations++
 	db.Save(&promo)
 
-	newUsedPromo := UsedPromoCode{
+	newUsedPromo := models.UsedPromoCode{
 		UserID:    chatID,
 		PromoCode: linkCode,
 		Used:      true,
@@ -327,7 +330,7 @@ func handleBroadcastCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *go
 	bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Рассылка началась."))
 }
 func broadcastMessage(bot *tgbotapi.BotAPI, db *gorm.DB, message string) {
-	var users []UserState
+	var users []models.UserState
 	db.Find(&users).Where("previously_subscribed = ? AND subscribed = ?", true, true)
 
 	for _, user := range users {
@@ -388,7 +391,7 @@ func formatBroadcastMessage(message string, entities []Entity) (string, error) {
 }
 
 func notifyAdminsAboutNewUser(bot *tgbotapi.BotAPI, user *tgbotapi.User, isPremium bool, db *gorm.DB) {
-	if !UserIsNew(db, user.ID) {
+	if !database.UserIsNew(db, user.ID) {
 		return
 	}
 	err := godotenv.Load()

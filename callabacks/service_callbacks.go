@@ -7,6 +7,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Cekretik/BoostBot/api"
+	"github.com/Cekretik/BoostBot/database"
+	"github.com/Cekretik/BoostBot/functionality"
+	"github.com/Cekretik/BoostBot/models"
+
 	tgbotapi "github.com/Cekretik/telegram-bot-api-master"
 	"gorm.io/gorm"
 )
@@ -23,7 +28,7 @@ func HandleCallbackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery *tgbot
 			return
 		}
 
-		keyboard, err := CreateSubcategoryKeyboard(db, categoryID, "1", strconv.Itoa(totalPages))
+		keyboard, err := functionality.CreateSubcategoryKeyboard(db, categoryID, "1", strconv.Itoa(totalPages))
 		if err != nil {
 			log.Println("Error creating subcategory keyboard:", err)
 			return
@@ -48,7 +53,7 @@ func HandleCallbackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery *tgbot
 			log.Println("Error recalculating total pages:", err)
 			return
 		}
-		keyboard, err := CreateSubcategoryKeyboard(db, parts[1], strconv.Itoa(currentPage), strconv.Itoa(totalPages))
+		keyboard, err := functionality.CreateSubcategoryKeyboard(db, parts[1], strconv.Itoa(currentPage), strconv.Itoa(totalPages))
 		if err != nil {
 			log.Println("Error updating subcategory keyboard:", err)
 			return
@@ -68,7 +73,7 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 			return
 		}
 
-		keyboard, err := CreateServiceKeyboard(db, subcategoryID, "1", strconv.Itoa(totalServicePages))
+		keyboard, err := functionality.CreateServiceKeyboard(db, subcategoryID, "1", strconv.Itoa(totalServicePages))
 		if err != nil {
 			log.Printf("Error creating service keyboard for subcategory '%s': %v", subcategoryID, err)
 			return
@@ -102,7 +107,7 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 			return
 		}
 
-		keyboard, err := CreateServiceKeyboard(db, subcategoryID, strconv.Itoa(currentPage), strconv.Itoa(totalServicePages))
+		keyboard, err := functionality.CreateServiceKeyboard(db, subcategoryID, strconv.Itoa(currentPage), strconv.Itoa(totalServicePages))
 		if err != nil {
 			log.Printf("Error updating service keyboard for subcategory '%s', page %d: %v", subcategoryID, currentPage, err)
 			return
@@ -113,18 +118,18 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 
 	} else if strings.HasPrefix(callbackQuery.Data, "serviceInfo:") {
 		serviceIDStr := strings.TrimPrefix(callbackQuery.Data, "serviceInfo:")
-		var service Services
+		var service models.Services
 		userID := callbackQuery.Message.Chat.ID
 		deleteMsg := tgbotapi.NewDeleteMessage(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID)
 		bot.Send(deleteMsg)
 
-		service, err := GetServiceByID(db, serviceIDStr)
+		service, err := database.GetServiceByID(db, serviceIDStr)
 		if err != nil {
 			log.Printf("Error getting service '%s': %v", service.Name, err)
 			return
 		}
 
-		subcategory, err := GetSubcategoryByID(db, service.CategoryID)
+		subcategory, err := database.GetSubcategoryByID(db, service.CategoryID)
 		if err != nil {
 			log.Printf("Error getting subcategory '%s': %v", subcategory.Name, err)
 			return
@@ -140,13 +145,13 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 		if err != nil {
 			increasePercent = 0 // или установите значение по умолчанию
 		}
-		userCurrency, err := getUserCurrency(db, userID)
+		userCurrency, err := database.GetUserCurrency(db, userID)
 		if err != nil {
 			log.Printf("Error getting user currency: %v", err)
 			return
 		}
-		currencyRate := getCurrentCurrencyRate()
-		msgText := FormatServiceInfo(service, subcategory, increasePercent, userCurrency, currencyRate)
+		currencyRate := api.GetCurrentCurrencyRate()
+		msgText := functionality.FormatServiceInfo(service, subcategory, increasePercent, userCurrency, currencyRate)
 		backData := "backToServices:" + service.CategoryID
 		keyboard := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
@@ -165,13 +170,13 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 
 	} else if strings.HasPrefix(callbackQuery.Data, "order:") {
 		serviceID := strings.TrimPrefix(callbackQuery.Data, "order:")
-		service, err := GetServiceByID(db, serviceID)
+		service, err := database.GetServiceByID(db, serviceID)
 		if err != nil {
 			log.Printf("Error getting service '%s': %v", serviceID, err)
 			bot.Send(tgbotapi.NewMessage(callbackQuery.Message.Chat.ID, "Ошибка при получении данных сервиса."))
 			return
 		}
-		handleOrderCommand(bot, callbackQuery.Message.Chat.ID, service)
+		functionality.HandleOrderCommand(bot, callbackQuery.Message.Chat.ID, service)
 	} else if strings.HasPrefix(callbackQuery.Data, "backToServices:") {
 		subcategoryID := strings.TrimPrefix(callbackQuery.Data, "backToServices:")
 		deleteMsg := tgbotapi.NewDeleteMessage(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID)
@@ -183,7 +188,7 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 			return
 		}
 
-		keyboard, err := CreateServiceKeyboard(db, subcategoryID, "1", strconv.Itoa(totalServicePages))
+		keyboard, err := functionality.CreateServiceKeyboard(db, subcategoryID, "1", strconv.Itoa(totalServicePages))
 		if err != nil {
 			log.Printf("Error creating service keyboard for subcategory '%s': %v", subcategoryID, err)
 			return
@@ -197,7 +202,7 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 		subcategoryID := strings.TrimPrefix(callbackQuery.Data, "backToSubcategories:")
 
 		// Получение объекта подкатегории по ID
-		subcategory, err := GetSubcategoryByID(db, subcategoryID)
+		subcategory, err := database.GetSubcategoryByID(db, subcategoryID)
 		if err != nil {
 			log.Printf("Error getting subcategory '%s': %v", subcategoryID, err)
 			return
@@ -213,7 +218,7 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 			return
 		}
 
-		keyboard, err := CreateSubcategoryKeyboard(db, subcategory.CategoryID, "1", strconv.Itoa(totalPages))
+		keyboard, err := functionality.CreateSubcategoryKeyboard(db, subcategory.CategoryID, "1", strconv.Itoa(totalPages))
 		if err != nil {
 			log.Printf("Error creating subcategory keyboard for category '%s': %v", subcategory.CategoryID, err)
 			return

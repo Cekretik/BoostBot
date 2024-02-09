@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Cekretik/BoostBot/database"
 	"github.com/Cekretik/BoostBot/models"
 	tgbotapi "github.com/Cekretik/telegram-bot-api-master"
 	"gorm.io/gorm"
@@ -116,10 +117,10 @@ func handleAddToFavoritesCallback(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQue
 
 	var responseText string
 	if action == "addFavorite" {
-		err = AddServiceToFavorites(db, userID, service.ID)
+		err = database.AddServiceToFavorites(db, userID, service.ID)
 		responseText = "Услуга добавлена в избранное"
 	} else if action == "removeFavorite" {
-		err = RemoveServiceFromFavorites(db, userID, service.ID)
+		err = database.RemoveServiceFromFavorites(db, userID, service.ID)
 		responseText = "Услуга удалена из избранного"
 	}
 

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Cekretik/BoostBot/models"
 	"github.com/joho/godotenv"
 )
 
@@ -27,7 +28,7 @@ func init() {
 	apiOrdersEndpoint = os.Getenv("API_ORDERS_ENDPOINT")
 	token = os.Getenv("STAGESMM_TOKEN")
 }
-func fetchOrders() ([]ServiceDetails, error) {
+func FetchOrders() ([]models.ServiceDetails, error) {
 
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", apiOrdersEndpoint, nil)
@@ -48,7 +49,7 @@ func fetchOrders() ([]ServiceDetails, error) {
 		return nil, err
 	}
 
-	var serviceDetails []ServiceDetails
+	var serviceDetails []models.ServiceDetails
 	err = json.Unmarshal(body, &serviceDetails)
 	if err != nil {
 		return nil, err
@@ -57,7 +58,7 @@ func fetchOrders() ([]ServiceDetails, error) {
 	return serviceDetails, nil
 }
 
-func createOrder(order Order, token string) (UserOrders, error) {
+func CreateOrder(order models.Order, token string) (models.UserOrders, error) {
 	client := &http.Client{}
 	// Создание данных для запроса из структуры Order
 	data := map[string]interface{}{
@@ -89,12 +90,12 @@ func createOrder(order Order, token string) (UserOrders, error) {
 
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return UserOrders{}, err
+		return models.UserOrders{}, err
 	}
 
 	req, err := http.NewRequest("POST", apiOrdersEndpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return UserOrders{}, err
+		return models.UserOrders{}, err
 	}
 
 	req.Header.Add("Authorization", token)
@@ -102,13 +103,13 @@ func createOrder(order Order, token string) (UserOrders, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return UserOrders{}, err
+		return models.UserOrders{}, err
 	}
 	defer resp.Body.Close()
 
-	var responseOrder UserOrders
+	var responseOrder models.UserOrders
 	if err := json.NewDecoder(resp.Body).Decode(&responseOrder); err != nil {
-		return UserOrders{}, err
+		return models.UserOrders{}, err
 	}
 
 	return responseOrder, nil
@@ -118,9 +119,9 @@ type RatesResponse struct {
 	RUB float64 `json:"RUB"`
 }
 
-var currentRate float64
+var CurrentRate float64
 
-func getCurrencyRate() (float64, error) {
+func GetCurrencyRate() (float64, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://api.stagesmm.com/rates", nil)
 	if err != nil {
@@ -153,15 +154,19 @@ func getCurrencyRate() (float64, error) {
 	return rate, nil
 }
 
-func updateCurrencyRatePeriodically() {
+func UpdateCurrencyRatePeriodically() {
 	for {
-		rate, err := getCurrencyRate()
+		rate, err := GetCurrencyRate()
 		if err != nil {
 			log.Printf("Error getting currency rate: %v", err)
 		} else {
-			currentRate = rate
-			log.Printf("Updated currency rate: %f", currentRate)
+			CurrentRate = rate
+			log.Printf("Updated currency rate: %f", CurrentRate)
 		}
 		time.Sleep(1 * time.Hour)
 	}
+}
+
+func GetCurrentCurrencyRate() float64 {
+	return CurrentRate
 }

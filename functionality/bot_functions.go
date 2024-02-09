@@ -6,6 +6,9 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/Cekretik/BoostBot/api"
+	"github.com/Cekretik/BoostBot/database"
+	"github.com/Cekretik/BoostBot/models"
 	tgbotapi "github.com/Cekretik/telegram-bot-api-master"
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
@@ -37,14 +40,13 @@ func translateOrderStatus(status string) string {
 }
 
 func handleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
-	var userState UserState
+	var userState models.UserState
 	if err := db.Where("user_id = ?", userID).First(&userState).Error; err != nil {
 		log.Printf("Error fetching user state: %v", err)
 		return
 	}
 
-	// Получаем текущий курс обмена
-	rate, err := getCurrencyRate()
+	rate, err := api.GetCurrencyRate()
 	if err != nil {
 		log.Printf("Error getting currency rate: %v", err)
 		return
@@ -55,9 +57,9 @@ func handleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
 
 	if userState.Currency == "RUB" {
 		balance = convertAmount(balance, rate, true)
-		balanceMsgText = fmt.Sprintf("💳 Ваш баланс: ₽%.*f", decimalPlaces, balance)
+		balanceMsgText = fmt.Sprintf("💳 Ваш баланс: ₽%.*f", main.DecimalPlaces, balance)
 	} else {
-		balanceMsgText = fmt.Sprintf("💳 Ваш баланс: $%.*f", decimalPlaces, balance)
+		balanceMsgText = fmt.Sprintf("💳 Ваш баланс: $%.*f", main.DecimalPlaces, balance)
 	}
 
 	msg := tgbotapi.NewMessage(userID, balanceMsgText)
@@ -76,12 +78,12 @@ func handleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
 }
 
 func handleProfileCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
-	var userState UserState
+	var userState models.UserState
 	if err := db.Where("user_id = ?", chatID).First(&userState).Error; err != nil {
 		log.Printf("Error fetching user state: %v", err)
 		return
 	}
-	rate, err := getCurrencyRate()
+	rate, err := api.GetCurrencyRate()
 	if err != nil {
 		log.Printf("Error getting currency rate: %v", err)
 		return
@@ -90,9 +92,9 @@ func handleProfileCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	var messageText string
 	if userState.Currency == "RUB" {
 		balance = convertAmount(balance, rate, true)
-		messageText = fmt.Sprintf("🤵‍♂️ Пользователь:%v\n 🔎 ID:%v\n 💳 Ваш баланс:₽%.*f", userState.UserName, userState.UserID, decimalPlaces, balance)
+		messageText = fmt.Sprintf("🤵‍♂️ Пользователь:%v\n 🔎 ID:%v\n 💳 Ваш баланс:₽%.*f", userState.UserName, userState.UserID, main.DecimalPlaces, balance)
 	} else {
-		messageText = fmt.Sprintf("🤵‍♂️ Пользователь:%v\n 🔎 ID:%v\n 💳 Ваш баланс:$%.*f", userState.UserName, userState.UserID, decimalPlaces, balance)
+		messageText = fmt.Sprintf("🤵‍♂️ Пользователь:%v\n 🔎 ID:%v\n 💳 Ваш баланс:$%.*f", userState.UserName, userState.UserID, main.DecimalPlaces, balance)
 	}
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
@@ -109,7 +111,7 @@ func handleProfileCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 }
 
 func handleOrdersCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
-	var userOrders []UserOrders
+	var userOrders []models.UserOrders
 	chatIDString := strconv.FormatInt(chatID, 10)
 	result := db.Where("user_id = ?", chatIDString).Find(&userOrders)
 
@@ -135,8 +137,8 @@ func handleOrdersCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	bot.Send(msg)
 }
 
-func GiveSubscriptionBonus(bot *tgbotapi.BotAPI, db *gorm.DB, userState *UserState) {
-	rate, _ := getCurrencyRate()
+func GiveSubscriptionBonus(bot *tgbotapi.BotAPI, db *gorm.DB, userState *models.UserState) {
+	rate, _ := api.GetCurrencyRate()
 	bonusAmount := 25.00 / rate
 	userState.Balance += bonusAmount
 	bonusGiven++
@@ -146,7 +148,7 @@ func GiveSubscriptionBonus(bot *tgbotapi.BotAPI, db *gorm.DB, userState *UserSta
 }
 
 func handleFavoritesCommand(bot *tgbotapi.BotAPI, db *gorm.DB, chatID int64) {
-	favorites, err := GetUserFavorites(db, chatID)
+	favorites, err := database.GetUserFavorites(db, chatID)
 	if err != nil || len(favorites) == 0 {
 		bot.Send(tgbotapi.NewMessage(chatID, "В избранном пока нет услуг."))
 		return
@@ -174,7 +176,7 @@ func GenerateReferralLink(chatID int64) string {
 }
 
 func ShowReferralStats(bot *tgbotapi.BotAPI, db *gorm.DB, userID int64) {
-	var referrals []Referral
+	var referrals []models.Referral
 	db.Where("referrer_id = ?", userID).Find(&referrals)
 	count := len(referrals)
 
@@ -190,7 +192,7 @@ func ShowReferralStats(bot *tgbotapi.BotAPI, db *gorm.DB, userID int64) {
 }
 
 func handleChangeCurrency(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB, toRUB bool) {
-	var user UserState
+	var user models.UserState
 	err := db.Where("user_id = ?", userID).First(&user).Error
 	if err != nil {
 		log.Printf("Error getting user: %v", err)
@@ -219,7 +221,7 @@ func handleChangeCurrency(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB, toRUB
 	bot.Send(msg)
 }
 
-func FormatServiceInfo(service Services, subcategory Subcategory, increasePercent float64, userCurrency string, currencyRate float64) string {
+func FormatServiceInfo(service models.Services, subcategory models.Subcategory, increasePercent float64, userCurrency string, currencyRate float64) string {
 	increasedRate := service.Rate + service.Rate*(increasePercent/100)
 
 	if userCurrency == "RUB" {
@@ -233,7 +235,7 @@ func FormatServiceInfo(service Services, subcategory Subcategory, increasePercen
 				"💸 Цена за 1000: %s%.*f\n\n"+
 				"📉 Минимальное количество: %d\n"+
 				"📈 Максимальное количество: %d",
-			service.ID, service.Name, subcategory.Name, currencySymbol, decimalPlaces, increasedRate, service.Min, service.Max)
+			service.ID, service.Name, subcategory.Name, currencySymbol, main.DecimalPlaces, increasedRate, service.Min, service.Max)
 	} else {
 		currencySymbol := "$"
 		return fmt.Sprintf(
@@ -244,6 +246,6 @@ func FormatServiceInfo(service Services, subcategory Subcategory, increasePercen
 				"💸 Цена за 1000: %s%.*f\n\n"+
 				"📉 Минимальное количество: %d\n"+
 				"📈 Максимальное количество: %d",
-			service.ID, service.Name, subcategory.Name, currencySymbol, decimalPlaces, increasedRate, service.Min, service.Max)
+			service.ID, service.Name, subcategory.Name, currencySymbol, main.DecimalPlaces, increasedRate, service.Min, service.Max)
 	}
 }

@@ -6,12 +6,15 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/Cekretik/BoostBot/api"
+	"github.com/Cekretik/BoostBot/models"
 )
 
 // Update categories, subcategories and services in DB
 func UpdateCategoriesInDB(db *gorm.DB, done chan bool) {
 	for {
-		categories, err := api.fetchCategoriesFromAPI()
+		categories, err := api.FetchCategoriesFromAPI()
 		if err != nil {
 			log.Printf("Error fetching categories from API: %v", err)
 		} else {
@@ -45,11 +48,11 @@ func UpdateCategoriesInDB(db *gorm.DB, done chan bool) {
 func UpdateSubcategoriesInDB(db *gorm.DB, done chan bool) {
 	for {
 		<-done
-		var categories []Category
+		var categories []models.Category
 		db.Find(&categories)
 
 		for _, category := range categories {
-			apiSubcategories, err := fetchSubcategoriesFromAPI(category.ID)
+			apiSubcategories, err := api.FetchSubcategoriesFromAPI(category.ID)
 			if err != nil {
 				log.Printf("Error fetching subcategories from API for category %s: %v", category.Name, err)
 				continue
@@ -64,7 +67,7 @@ func UpdateSubcategoriesInDB(db *gorm.DB, done chan bool) {
 			}
 
 			// Удаление подкатегорий, которые есть в БД, но отсутствуют в API
-			var existingSubcategories []Subcategory
+			var existingSubcategories []models.Subcategory
 			db.Where("category_id = ?", category.ID).Find(&existingSubcategories)
 			for _, existingSubcategory := range existingSubcategories {
 				if _, found := apiSubcategoryIDs[existingSubcategory.ID]; !found {
@@ -80,14 +83,14 @@ func UpdateSubcategoriesInDB(db *gorm.DB, done chan bool) {
 func UpdateServicesInDB(db *gorm.DB, done chan bool) {
 	for {
 
-		var subcategories []Subcategory
+		var subcategories []models.Subcategory
 		if err := db.Find(&subcategories).Error; err != nil {
 			log.Printf("Error fetching subcategories: %v", err)
 			continue
 		}
 
 		for _, subcategory := range subcategories {
-			apiServices, err := fetchServicesFromAPI(subcategory.ID)
+			apiServices, err := api.FetchServicesFromAPI(subcategory.ID)
 			if err != nil {
 				log.Printf("Error fetching services from API for subcategory %s: %v", subcategory.Name, err)
 				continue
@@ -102,7 +105,7 @@ func UpdateServicesInDB(db *gorm.DB, done chan bool) {
 					}
 				}
 
-				var existingServices []Services
+				var existingServices []models.Services
 				if err := tx.Where("category_id = ?", subcategory.ID).Find(&existingServices).Error; err != nil {
 					return err
 				}
@@ -126,8 +129,8 @@ func UpdateServicesInDB(db *gorm.DB, done chan bool) {
 }
 
 // Get categories, subcategories and services from DB
-func GetCategoriesFromDB(db *gorm.DB) ([]Category, error) {
-	var categories []Category
+func GetCategoriesFromDB(db *gorm.DB) ([]models.Category, error) {
+	var categories []models.Category
 	if err := db.Find(&categories).Error; err != nil {
 		log.Printf("Error fetching categories from DB: %v", err)
 		return nil, err
@@ -135,8 +138,8 @@ func GetCategoriesFromDB(db *gorm.DB) ([]Category, error) {
 	return categories, nil
 }
 
-func GetSubCategoriesFromDB(db *gorm.DB) ([]Subcategory, error) {
-	var subcategories []Subcategory
+func GetSubCategoriesFromDB(db *gorm.DB) ([]models.Subcategory, error) {
+	var subcategories []models.Subcategory
 	if err := db.Find(&subcategories).Error; err != nil {
 		log.Printf("Error fetching subcategories from DB: %v", err)
 		return nil, err
@@ -144,8 +147,8 @@ func GetSubCategoriesFromDB(db *gorm.DB) ([]Subcategory, error) {
 	return subcategories, nil
 }
 
-func GetServicesFromDB(db *gorm.DB) ([]Services, error) {
-	var services []Services
+func GetServicesFromDB(db *gorm.DB) ([]models.Services, error) {
+	var services []models.Services
 	if err := db.Find(&services).Error; err != nil {
 		log.Printf("Error fetching services from DB: %v", err)
 		return nil, err
@@ -154,8 +157,8 @@ func GetServicesFromDB(db *gorm.DB) ([]Services, error) {
 }
 
 // Get subcategories by category ID
-func GetSubcategoriesByCategoryID(db *gorm.DB, categoryID string) ([]Subcategory, error) {
-	var subcategories []Subcategory
+func GetSubcategoriesByCategoryID(db *gorm.DB, categoryID string) ([]models.Subcategory, error) {
+	var subcategories []models.Subcategory
 	if err := db.Where("category_id = ?", categoryID).Find(&subcategories).Error; err != nil {
 		return nil, err
 	}
@@ -163,8 +166,8 @@ func GetSubcategoriesByCategoryID(db *gorm.DB, categoryID string) ([]Subcategory
 }
 
 // Get services by subcategory ID
-func GetServicesBySubcategoryID(db *gorm.DB, subcategoryID string) ([]Services, error) {
-	var services []Services
+func GetServicesBySubcategoryID(db *gorm.DB, subcategoryID string) ([]models.Services, error) {
+	var services []models.Services
 	if err := db.Where("category_id = ?", subcategoryID).Find(&services).Error; err != nil {
 		return nil, err
 	}
@@ -172,22 +175,22 @@ func GetServicesBySubcategoryID(db *gorm.DB, subcategoryID string) ([]Services, 
 }
 
 // Get service by service ID
-func GetServiceByID(db *gorm.DB, serviceID string) (Services, error) {
-	var service Services
+func GetServiceByID(db *gorm.DB, serviceID string) (models.Services, error) {
+	var service models.Services
 	result := db.First(&service, "service_id = ?", serviceID)
 	return service, result.Error
 }
 
 // Get subcategory by subcategory ID
-func GetSubcategoryByID(db *gorm.DB, subcategoryID string) (Subcategory, error) {
-	var subcategory Subcategory
+func GetSubcategoryByID(db *gorm.DB, subcategoryID string) (models.Subcategory, error) {
+	var subcategory models.Subcategory
 	result := db.First(&subcategory, "subcategory_id = ?", subcategoryID)
 	return subcategory, result.Error
 }
 
 // Updating category, subcategory and service
-func updateCategory(tx *gorm.DB, newCategory Category) error {
-	var existingCategory Category
+func updateCategory(tx *gorm.DB, newCategory models.Category) error {
+	var existingCategory models.Category
 	result := tx.Where("category_id = ?", newCategory.ID).First(&existingCategory)
 
 	if result.Error != nil {
@@ -198,14 +201,14 @@ func updateCategory(tx *gorm.DB, newCategory Category) error {
 	}
 
 	if existingCategory.Name != newCategory.Name {
-		return tx.Model(&existingCategory).Updates(Category{Name: newCategory.Name}).Error
+		return tx.Model(&existingCategory).Updates(models.Category{Name: newCategory.Name}).Error
 	}
 
 	return nil
 }
 
-func updateSubcategory(tx *gorm.DB, newSubcategory Subcategory) error {
-	var existingSubcategory Subcategory
+func updateSubcategory(tx *gorm.DB, newSubcategory models.Subcategory) error {
+	var existingSubcategory models.Subcategory
 	result := tx.Where("subcategory_id = ?", newSubcategory.ID).First(&existingSubcategory)
 
 	if result.Error != nil {
@@ -216,20 +219,20 @@ func updateSubcategory(tx *gorm.DB, newSubcategory Subcategory) error {
 	}
 
 	if existingSubcategory.Name != newSubcategory.Name || existingSubcategory.CategoryID != newSubcategory.CategoryID {
-		return tx.Model(&existingSubcategory).Updates(Subcategory{Name: newSubcategory.Name, CategoryID: newSubcategory.CategoryID}).Error
+		return tx.Model(&existingSubcategory).Updates(models.Subcategory{Name: newSubcategory.Name, CategoryID: newSubcategory.CategoryID}).Error
 	}
 
 	return nil
 }
 
-func GetService(db *gorm.DB, id int) (Services, error) {
-	var service Services
+func GetService(db *gorm.DB, id int) (models.Services, error) {
+	var service models.Services
 	result := db.First(&service, "id = ?", id)
 	return service, result.Error
 }
 
-func updateService(tx *gorm.DB, newService Services) error {
-	var existingService Services
+func updateService(tx *gorm.DB, newService models.Services) error {
+	var existingService models.Services
 	result := tx.Where("service_id = ?", newService.ServiceID).First(&existingService)
 
 	if result.Error != nil {
@@ -250,7 +253,7 @@ func updateService(tx *gorm.DB, newService Services) error {
 		existingService.ServiceID != newService.ServiceID ||
 		existingService.Rate != newService.Rate ||
 		existingService.Type != newService.Type {
-		return tx.Model(&existingService).Updates(Services{ID: newService.ID, Name: newService.Name, CategoryID: newService.CategoryID, Min: newService.Min,
+		return tx.Model(&existingService).Updates(models.Services{ID: newService.ID, Name: newService.Name, CategoryID: newService.CategoryID, Min: newService.Min,
 			Max: newService.Max, Dripfeed: newService.Dripfeed, Refill: newService.Refill, Cancel: newService.Cancel, ServiceID: newService.ServiceID, Rate: newService.Rate,
 			Type: newService.Type}).Error
 	}
@@ -260,7 +263,7 @@ func updateService(tx *gorm.DB, newService Services) error {
 
 func updateOrdersPeriodically(db *gorm.DB, done chan bool) {
 	for {
-		serviceDetails, err := fetchOrders()
+		serviceDetails, err := api.FetchOrders()
 		if err != nil {
 			log.Printf("Error fetching orders from API: %v", err)
 			continue
@@ -269,7 +272,7 @@ func updateOrdersPeriodically(db *gorm.DB, done chan bool) {
 		tx := db.Begin()
 
 		for _, detail := range serviceDetails {
-			var order UserOrders
+			var order models.UserOrders
 			if err := tx.Where("order_id = ?", detail.ID).First(&order).Error; err != nil {
 				continue
 			}
@@ -292,13 +295,13 @@ func updateOrdersPeriodically(db *gorm.DB, done chan bool) {
 			// Возврат средств
 			if order.Status == "CANCELED" || order.Status == "PARTIAL" {
 				// Проверяем, был ли этот заказ уже возвращен
-				var refundedOrder RefundedOrder
+				var refundedOrder models.RefundedOrder
 				if err := tx.Where("order_id = ?", order.ID).First(&refundedOrder).Error; err == nil {
 					// Заказ уже возвращен, пропускаем его
 					continue
 				}
 
-				var user UserState
+				var user models.UserState
 				if err := tx.Where("user_id = ?", order.ChatID).First(&user).Error; err != nil {
 					log.Printf("Error finding user with ChatID %s: %v", order.ChatID, err)
 					continue
@@ -315,7 +318,7 @@ func updateOrdersPeriodically(db *gorm.DB, done chan bool) {
 				tx.Save(&user)
 
 				// Добавляем запись о возврате заказа в базу данных
-				tx.Create(&RefundedOrder{OrderID: order.ID})
+				tx.Create(&models.RefundedOrder{OrderID: order.ID})
 			}
 		}
 
@@ -333,12 +336,12 @@ func updateOrdersPeriodically(db *gorm.DB, done chan bool) {
 }
 
 func AddServiceToFavorites(db *gorm.DB, userID int64, serviceID int) error {
-	var user UserState
+	var user models.UserState
 	if err := db.Where("user_id = ?", userID).First(&user).Error; err != nil {
 		log.Printf("User not found with userID %d: %v", userID, err)
 		return err
 	}
-	var service Services
+	var service models.Services
 	if err := db.Where("id = ?", serviceID).First(&service).Error; err != nil {
 		log.Printf("Service not found with serviceID %d: %v", service.ID, err)
 		return err
@@ -348,8 +351,8 @@ func AddServiceToFavorites(db *gorm.DB, userID int64, serviceID int) error {
 }
 
 func RemoveServiceFromFavorites(db *gorm.DB, userID int64, serviceID int) error {
-	var user UserState
-	var service Services
+	var user models.UserState
+	var service models.Services
 	if err := db.Where("user_id = ?", userID).First(&user).Error; err != nil {
 		return err
 	}

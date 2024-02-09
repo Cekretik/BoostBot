@@ -15,7 +15,7 @@ const (
 	apiServicesEndpointFormat = "https://api.stagesmm.com/services?search=&limit=25000&subcategory_id=%s&pagination=1&order=DESC&order_by=id"
 )
 
-func fetchCategoriesFromAPI() ([]models.Category, error) {
+func FetchCategoriesFromAPI() ([]models.Category, error) {
 	resp, err := http.Get(apiCategoriesEndpoint)
 	if err != nil {
 		return nil, err
@@ -38,7 +38,7 @@ func fetchCategoriesFromAPI() ([]models.Category, error) {
 	return categories, nil
 }
 
-func fetchSubcategoriesFromAPI(categoryID string) ([]models.Subcategory, error) {
+func FetchSubcategoriesFromAPI(categoryID string) ([]models.Subcategory, error) {
 	resp, err := http.Get(apiSubcategoriesEndpoint + categoryID)
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func fetchSubcategoriesFromAPI(categoryID string) ([]models.Subcategory, error) 
 	return subcategories, nil
 }
 
-func fetchServicesFromAPI(subcategoryID string) ([]models.Services, error) {
+func FetchServicesFromAPI(subcategoryID string) ([]models.Services, error) {
 	apiUrl := fmt.Sprintf(apiServicesEndpointFormat, subcategoryID)
 	resp, err := http.Get(apiUrl)
 	if err != nil {

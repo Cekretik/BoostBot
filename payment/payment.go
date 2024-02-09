@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Cekretik/BoostBot/models"
 	tgbotapi "github.com/Cekretik/telegram-bot-api-master"
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
@@ -353,41 +354,11 @@ func updateUserStatus(chatID int64) *UserPaymentStatus {
 	return newUserStatus
 }
 
-func UpdateUserBalance(db *gorm.DB, userID int64, amount float64) error {
-	var user UserState
-	if err := db.Where("user_id = ?", userID).First(&user).Error; err != nil {
-		return err
-	}
-
-	var activePromoCode UsedPromoCode
-	if err := db.Where("user_id = ? AND used = ?", userID, false).First(&activePromoCode).Error; err == nil {
-		var promo PromoCode
-		if err := db.Where("code = ?", activePromoCode.PromoCode).First(&promo).Error; err == nil {
-			bonus := amount * promo.Discount / 100
-			amount += bonus
-
-			db.Model(&UsedPromoCode{}).Where("user_id = ? AND promo_code = ?", userID, activePromoCode.PromoCode).Update("used", true)
-		}
-	}
-
-	user.Balance += amount
-	if err := db.Save(&user).Error; err != nil {
-		return err
-	}
-
-	var referral Referral
-	if err := db.Where("referred_id = ?", userID).First(&referral).Error; err == nil {
-		commission := amount * 0.10
-		db.Model(&UserState{}).Where("user_id = ?", referral.ReferrerID).Update("balance", gorm.Expr("balance + ?", commission))
-		db.Model(&Referral{}).Where("id = ?", referral.ID).Update("amount_earned", gorm.Expr("amount_earned + ?", commission))
-	}
-	return nil
-}
-func isOrderExpired(userStatus *UserPaymentStatus) bool {
+func IsOrderExpired(userStatus *UserPaymentStatus) bool {
 	return userStatus.PaymentStatus == "cancel" || userStatus.PaymentStatus == "fail"
 }
 
-func handleCreatePayment(w http.ResponseWriter, r *http.Request, db *gorm.DB) {
+func HandleCreatePayment(w http.ResponseWriter, r *http.Request, db *gorm.DB) {
 	var req CreatePaymentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -400,7 +371,7 @@ func handleCreatePayment(w http.ResponseWriter, r *http.Request, db *gorm.DB) {
 		return
 	}
 
-	newPayment := Payments{
+	newPayment := models.Payments{
 		ChatID:  int(req.ChatID),
 		OrderID: orderID,
 		Amount:  req.Amount,
@@ -416,7 +387,7 @@ func handleCreatePayment(w http.ResponseWriter, r *http.Request, db *gorm.DB) {
 	}
 	json.NewEncoder(w).Encode(response)
 }
-func handleCreatePaymentAAIO(w http.ResponseWriter, r *http.Request, db *gorm.DB) {
+func HandleCreatePaymentAAIO(w http.ResponseWriter, r *http.Request, db *gorm.DB) {
 	var req CreatePaymentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -433,7 +404,7 @@ func handleCreatePaymentAAIO(w http.ResponseWriter, r *http.Request, db *gorm.DB
 	}
 
 	// Сохранение информации о платеже в БД
-	newPayment := Payments{
+	newPayment := models.Payments{
 		ChatID:  int(req.ChatID),
 		OrderID: orderID,
 		Amount:  req.Amount,
@@ -460,11 +431,11 @@ func startHTTPServer(db *gorm.DB) {
 		handleWebhook(db, w, r)
 	})
 	http.HandleFunc("/create_payment", func(w http.ResponseWriter, r *http.Request) {
-		handleCreatePayment(w, r, db)
+		HandleCreatePayment(w, r, db)
 	})
 
 	http.HandleFunc("/create_payment_aaio", func(w http.ResponseWriter, r *http.Request) {
-		handleCreatePaymentAAIO(w, r, db)
+		HandleCreatePaymentAAIO(w, r, db)
 	})
 
 	http.HandleFunc("/aaio_notification", func(w http.ResponseWriter, r *http.Request) {

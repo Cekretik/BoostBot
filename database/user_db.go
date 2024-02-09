@@ -4,17 +4,18 @@ import (
 	"errors"
 	"log"
 
+	"github.com/Cekretik/BoostBot/models"
 	"gorm.io/gorm"
 )
 
 // Get user state
-func GetUserState(db *gorm.DB, userID, channelID int64, subscribed bool, balance float64, userName string) (*UserState, error) {
-	var userState UserState
+func GetUserState(db *gorm.DB, userID, channelID int64, subscribed bool, balance float64, userName string) (*models.UserState, error) {
+	var userState models.UserState
 	result := db.Where("user_id = ? AND channel_id = ?", userID, channelID).First(&userState)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			userState = UserState{
+			userState = models.UserState{
 				UserID:     userID,
 				UserName:   userName,
 				ChannelID:  channelID,
@@ -56,8 +57,39 @@ func UpdateUserState(db *gorm.DB, userID, channelID int64, subscribed bool, bala
 	return nil
 }
 
-func updatePaymentStatusInDB(db *gorm.DB, orderID, status string) error {
-	var payment Payments
+func UpdateUserBalance(db *gorm.DB, userID int64, amount float64) error {
+	var user models.UserState
+	if err := db.Where("user_id = ?", userID).First(&user).Error; err != nil {
+		return err
+	}
+
+	var activePromoCode models.UsedPromoCode
+	if err := db.Where("user_id = ? AND used = ?", userID, false).First(&activePromoCode).Error; err == nil {
+		var promo models.PromoCode
+		if err := db.Where("code = ?", activePromoCode.PromoCode).First(&promo).Error; err == nil {
+			bonus := amount * promo.Discount / 100
+			amount += bonus
+
+			db.Model(&models.UsedPromoCode{}).Where("user_id = ? AND promo_code = ?", userID, activePromoCode.PromoCode).Update("used", true)
+		}
+	}
+
+	user.Balance += amount
+	if err := db.Save(&user).Error; err != nil {
+		return err
+	}
+
+	var referral models.Referral
+	if err := db.Where("referred_id = ?", userID).First(&referral).Error; err == nil {
+		commission := amount * 0.10
+		db.Model(&models.UserState{}).Where("user_id = ?", referral.ReferrerID).Update("balance", gorm.Expr("balance + ?", commission))
+		db.Model(&models.Referral{}).Where("id = ?", referral.ID).Update("amount_earned", gorm.Expr("amount_earned + ?", commission))
+	}
+	return nil
+}
+
+func UpdatePaymentStatusInDB(db *gorm.DB, orderID, status string) error {
+	var payment models.Payments
 	if err := db.Model(&payment).Where("order_id = ?", orderID).Update("status", status).Error; err != nil {
 		return err
 	}
@@ -65,28 +97,24 @@ func updatePaymentStatusInDB(db *gorm.DB, orderID, status string) error {
 }
 
 func UserIsNew(db *gorm.DB, userID int64) bool {
-	var user UserState
+	var user models.UserState
 	result := db.Where("user_id = ?", userID).First(&user)
 	return errors.Is(result.Error, gorm.ErrRecordNotFound)
 }
 
-func GetUserFavorites(db *gorm.DB, userID int64) ([]Services, error) {
-	var user UserState
+func GetUserFavorites(db *gorm.DB, userID int64) ([]models.Services, error) {
+	var user models.UserState
 	if err := db.Preload("Favorites").Where("user_id = ?", userID).First(&user).Error; err != nil {
 		return nil, err
 	}
 	return user.Favorites, nil
 }
 
-func getUserCurrency(db *gorm.DB, userID int64) (string, error) {
-	var user UserState
+func GetUserCurrency(db *gorm.DB, userID int64) (string, error) {
+	var user models.UserState
 	if err := db.Where("user_id = ?", userID).First(&user).Error; err != nil {
 		log.Printf("Error fetching user state: %v", err)
 		return "", err
 	}
 	return user.Currency, nil
-}
-
-func getCurrentCurrencyRate() float64 {
-	return currentRate
 }

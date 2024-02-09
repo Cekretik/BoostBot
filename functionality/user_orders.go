@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Cekretik/BoostBot/api"
+	"github.com/Cekretik/BoostBot/models"
 	tgbotapi "github.com/Cekretik/telegram-bot-api-master"
 	"gorm.io/gorm"
 )
@@ -23,7 +25,7 @@ type UserStatus struct {
 
 var userStatuses map[int64]*UserStatus = make(map[int64]*UserStatus)
 
-func getUserStatus(chatID int64) *UserStatus {
+func GetUserStatus(chatID int64) *UserStatus {
 	if status, exists := userStatuses[chatID]; exists {
 		return status
 	}
@@ -31,8 +33,8 @@ func getUserStatus(chatID int64) *UserStatus {
 	return userStatuses[chatID]
 }
 
-func handleOrderCommand(bot *tgbotapi.BotAPI, chatID int64, service Services) {
-	userStatus := getUserStatus(chatID)
+func HandleOrderCommand(bot *tgbotapi.BotAPI, chatID int64, service Services) {
+	userStatus := GetUserStatus(chatID)
 	userStatus.CurrentState = "awaitingLink"
 	userStatus.PendingServiceID = strconv.Itoa(service.ID)
 
@@ -47,26 +49,26 @@ func handleOrderCommand(bot *tgbotapi.BotAPI, chatID int64, service Services) {
 	bot.Send(msg)
 }
 
-func isValidURL(url string) bool {
+func IsValidURL(url string) bool {
 	return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
 }
 
-func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, service Services) {
+func HandleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, service Services) {
 	chatID := update.Message.Chat.ID
-	userStatus := getUserStatus(chatID)
+	userStatus := GetUserStatus(chatID)
 
-	var user UserState
+	var user models.UserState
 	if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {
 		log.Printf("Error fetching user state: %v", err)
 		return
 	}
 	userCurrency := user.Currency
-	currencyRate := getCurrentCurrencyRate()
+	currencyRate := api.GetCurrentCurrencyRate()
 
 	switch userStatus.CurrentState {
 	case "awaitingLink":
 		link := update.Message.Text
-		if !isValidURL(link) {
+		if !IsValidURL(link) {
 			bot.Send(tgbotapi.NewMessage(chatID, "Введите ссылку корректно."))
 			return
 		}
@@ -94,7 +96,7 @@ func handleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 		cost := (float64(quantity) / 1000.0) * service.Rate
 		cost += cost * (increasePercent / 100.0)
 		// Получение баланса пользователя
-		var user UserState
+		var user models.UserState
 		if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {
 			bot.Send(tgbotapi.NewMessage(chatID, "Произошла ошибка при получении информации о вашем балансе."))
 			return
