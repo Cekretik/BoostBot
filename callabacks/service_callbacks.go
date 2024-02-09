@@ -22,7 +22,7 @@ func HandleCallbackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery *tgbot
 
 	if action == "category" {
 		categoryID := parts[1]
-		totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, categoryID)
+		totalPages, err := GetTotalPagesForCategory(db, ItemsPerPage, categoryID)
 		if err != nil {
 			log.Println("Error calculating total pages:", err)
 			return
@@ -48,7 +48,7 @@ func HandleCallbackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery *tgbot
 		} else if action == "nextCat" && currentPage < totalPages {
 			currentPage++
 		}
-		totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, parts[1])
+		totalPages, err := GetTotalPagesForCategory(db, ItemsPerPage, parts[1])
 		if err != nil {
 			log.Println("Error recalculating total pages:", err)
 			return
@@ -67,7 +67,7 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 	if strings.HasPrefix(callbackQuery.Data, "subcategory:") {
 		subcategoryID := strings.TrimPrefix(callbackQuery.Data, "subcategory:")
 
-		totalServicePages, err := GetTotalPagesForService(db, itemsPerPage, subcategoryID)
+		totalServicePages, err := GetTotalPagesForService(db, ItemsPerPage, subcategoryID)
 		if err != nil {
 			log.Printf("Error calculating total pages for subcategory '%s': %v", subcategoryID, err)
 			return
@@ -101,7 +101,7 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 			currentPage++
 		}
 
-		totalServicePages, err := GetTotalPagesForService(db, itemsPerPage, subcategoryID)
+		totalServicePages, err := GetTotalPagesForService(db, ItemsPerPage, subcategoryID)
 		if err != nil {
 			log.Printf("Error recalculating total pages for subcategory '%s': %v", subcategoryID, err)
 			return
@@ -182,7 +182,7 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 		deleteMsg := tgbotapi.NewDeleteMessage(callbackQuery.Message.Chat.ID, callbackQuery.Message.MessageID)
 		bot.Send(deleteMsg)
 
-		totalServicePages, err := GetTotalPagesForService(db, itemsPerPage, subcategoryID)
+		totalServicePages, err := GetTotalPagesForService(db, ItemsPerPage, subcategoryID)
 		if err != nil {
 			log.Printf("Error getting total pages for services: %v", err)
 			return
@@ -212,7 +212,7 @@ func HandleServiceCallBackQuery(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery
 		bot.Send(deleteMsg)
 
 		// Получение списка подкатегорий для категории, к которой принадлежит текущая подкатегория
-		totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, subcategory.CategoryID)
+		totalPages, err := GetTotalPagesForCategory(db, ItemsPerPage, subcategory.CategoryID)
 		if err != nil {
 			log.Printf("Error calculating total pages for category '%s': %v", subcategory.CategoryID, err)
 			return

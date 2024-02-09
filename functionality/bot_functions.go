@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/Cekretik/BoostBot/api"
+	"github.com/Cekretik/BoostBot/cmd"
 	"github.com/Cekretik/BoostBot/database"
 	"github.com/Cekretik/BoostBot/models"
 	tgbotapi "github.com/Cekretik/telegram-bot-api-master"
@@ -57,9 +58,9 @@ func handleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
 
 	if userState.Currency == "RUB" {
 		balance = convertAmount(balance, rate, true)
-		balanceMsgText = fmt.Sprintf("💳 Ваш баланс: ₽%.*f", main.DecimalPlaces, balance)
+		balanceMsgText = fmt.Sprintf("💳 Ваш баланс: ₽%.*f", cmd.DecimalPlaces, balance)
 	} else {
-		balanceMsgText = fmt.Sprintf("💳 Ваш баланс: $%.*f", main.DecimalPlaces, balance)
+		balanceMsgText = fmt.Sprintf("💳 Ваш баланс: $%.*f", cmd.DecimalPlaces, balance)
 	}
 
 	msg := tgbotapi.NewMessage(userID, balanceMsgText)
@@ -235,7 +236,7 @@ func FormatServiceInfo(service models.Services, subcategory models.Subcategory, 
 				"💸 Цена за 1000: %s%.*f\n\n"+
 				"📉 Минимальное количество: %d\n"+
 				"📈 Максимальное количество: %d",
-			service.ID, service.Name, subcategory.Name, currencySymbol, main.DecimalPlaces, increasedRate, service.Min, service.Max)
+			service.ID, service.Name, subcategory.Name, currencySymbol, cmd.DecimalPlaces, increasedRate, service.Min, service.Max)
 	} else {
 		currencySymbol := "$"
 		return fmt.Sprintf(
@@ -246,6 +247,6 @@ func FormatServiceInfo(service models.Services, subcategory models.Subcategory, 
 				"💸 Цена за 1000: %s%.*f\n\n"+
 				"📉 Минимальное количество: %d\n"+
 				"📈 Максимальное количество: %d",
-			service.ID, service.Name, subcategory.Name, currencySymbol, main.DecimalPlaces, increasedRate, service.Min, service.Max)
+			service.ID, service.Name, subcategory.Name, currencySymbol, cmd.DecimalPlaces, increasedRate, service.Min, service.Max)
 	}
 }

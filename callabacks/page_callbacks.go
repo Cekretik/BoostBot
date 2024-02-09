@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-var itemsPerPage = 10
+var ItemsPerPage = 10
 
 func GetTotalPagesForCategory(db *gorm.DB, itemsPerPage int, categoryID string) (int, error) {
 	var totalSubcategories int64

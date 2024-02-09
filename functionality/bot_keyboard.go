@@ -146,7 +146,7 @@ func SendPromotionMessage(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	}
 	categoryID := ""
 
-	totalPages, err := GetTotalPagesForCategory(db, itemsPerPage, categoryID)
+	totalPages, err := database.GetTotalPagesForCategory(db, callbacks.itemsPerPage, categoryID)
 	if err != nil {
 		log.Println("Error getting total pages:", err)
 		return
@@ -165,7 +165,7 @@ func SendPromotionMessage(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 		return
 	}
 
-	subcategories, err := GetSubcategoriesByCategoryID(db, categoryID)
+	subcategories, err := database.GetSubcategoriesByCategoryID(db, categoryID)
 	if err != nil {
 		log.Println("Error getting subcategories:", err)
 		return
