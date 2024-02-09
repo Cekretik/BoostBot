@@ -11,7 +11,7 @@ import (
 // Update categories, subcategories and services in DB
 func UpdateCategoriesInDB(db *gorm.DB, done chan bool) {
 	for {
-		categories, err := fetchCategoriesFromAPI()
+		categories, err := api.fetchCategoriesFromAPI()
 		if err != nil {
 			log.Printf("Error fetching categories from API: %v", err)
 		} else {

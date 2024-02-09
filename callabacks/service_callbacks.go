@@ -1,4 +1,4 @@
-package main
+package callbacks
 
 import (
 	"fmt"

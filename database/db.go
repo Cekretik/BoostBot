@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	models "github.com/Cekretik/BoostBot/database/models"
+	"github.com/Cekretik/BoostBot/models"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

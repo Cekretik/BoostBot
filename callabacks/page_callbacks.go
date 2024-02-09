@@ -1,10 +1,11 @@
-package main
+package callbacks
 
 import (
 	"fmt"
 	"strconv"
 	"strings"
 
+	"github.com/Cekretik/BoostBot/models"
 	tgbotapi "github.com/Cekretik/telegram-bot-api-master"
 	"gorm.io/gorm"
 )
@@ -13,7 +14,7 @@ var itemsPerPage = 10
 
 func GetTotalPagesForCategory(db *gorm.DB, itemsPerPage int, categoryID string) (int, error) {
 	var totalSubcategories int64
-	if err := db.Model(&Subcategory{}).Where("category_id = ?", categoryID).Count(&totalSubcategories).Error; err != nil {
+	if err := db.Model(&models.Subcategory{}).Where("category_id = ?", categoryID).Count(&totalSubcategories).Error; err != nil {
 		return 0, err
 	}
 
@@ -31,7 +32,7 @@ func GetTotalPagesForCategory(db *gorm.DB, itemsPerPage int, categoryID string) 
 
 func GetTotalPagesForService(db *gorm.DB, itemsPerPage int, subcategoryID string) (int, error) {
 	var totalServices int64
-	if err := db.Model(&Services{}).Where("category_id = ?", subcategoryID).Count(&totalServices).Error; err != nil {
+	if err := db.Model(&models.Services{}).Where("category_id = ?", subcategoryID).Count(&totalServices).Error; err != nil {
 		return 0, err
 	}
 
@@ -107,7 +108,7 @@ func handleAddToFavoritesCallback(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQue
 	userID := callbackQuery.Message.Chat.ID
 
 	// Получение объекта услуги из базы данных
-	var service Services
+	var service models.Services
 	if err := db.First(&service, serviceID).Error; err != nil {
 		bot.Request(tgbotapi.NewCallback(callbackQuery.ID, "Услуга не найдена"))
 		return

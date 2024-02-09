@@ -1,10 +1,12 @@
-package main
+package api
 
 import (
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/Cekretik/BoostBot/models"
 )
 
 const (
@@ -13,7 +15,7 @@ const (
 	apiServicesEndpointFormat = "https://api.stagesmm.com/services?search=&limit=25000&subcategory_id=%s&pagination=1&order=DESC&order_by=id"
 )
 
-func fetchCategoriesFromAPI() ([]Category, error) {
+func fetchCategoriesFromAPI() ([]models.Category, error) {
 	resp, err := http.Get(apiCategoriesEndpoint)
 	if err != nil {
 		return nil, err
@@ -27,7 +29,7 @@ func fetchCategoriesFromAPI() ([]Category, error) {
 
 	//fmt.Println(string(body))
 
-	var categories []Category
+	var categories []models.Category
 	err = json.Unmarshal(body, &categories)
 	if err != nil {
 		return nil, err
@@ -36,7 +38,7 @@ func fetchCategoriesFromAPI() ([]Category, error) {
 	return categories, nil
 }
 
-func fetchSubcategoriesFromAPI(categoryID string) ([]Subcategory, error) {
+func fetchSubcategoriesFromAPI(categoryID string) ([]models.Subcategory, error) {
 	resp, err := http.Get(apiSubcategoriesEndpoint + categoryID)
 	if err != nil {
 		return nil, err
@@ -50,7 +52,7 @@ func fetchSubcategoriesFromAPI(categoryID string) ([]Subcategory, error) {
 
 	//fmt.Println(string(body))
 
-	var subcategories []Subcategory
+	var subcategories []models.Subcategory
 	err = json.Unmarshal(body, &subcategories)
 	if err != nil {
 		return nil, err
@@ -59,7 +61,7 @@ func fetchSubcategoriesFromAPI(categoryID string) ([]Subcategory, error) {
 	return subcategories, nil
 }
 
-func fetchServicesFromAPI(subcategoryID string) ([]Services, error) {
+func fetchServicesFromAPI(subcategoryID string) ([]models.Services, error) {
 	apiUrl := fmt.Sprintf(apiServicesEndpointFormat, subcategoryID)
 	resp, err := http.Get(apiUrl)
 	if err != nil {
@@ -75,7 +77,7 @@ func fetchServicesFromAPI(subcategoryID string) ([]Services, error) {
 	// fmt.Println(string(body))
 
 	var response struct {
-		Services []Services `json:"services"`
+		Services []models.Services `json:"services"`
 	}
 	err = json.Unmarshal(body, &response)
 	if err != nil {
