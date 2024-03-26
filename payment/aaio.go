@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/Cekretik/BoostBot/database"
+	"github.com/Cekretik/BoostBot/models"
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 )
@@ -88,7 +90,7 @@ func handleAAIONotification(db *gorm.DB, w http.ResponseWriter, r *http.Request)
 		return
 	}
 	orderID := r.FormValue("payment_id")
-	var payment Payments
+	var payment models.Payments
 	if err := db.Where("order_id = ?", orderID).First(&payment).Error; err != nil {
 		http.Error(w, "Payment not found", http.StatusNotFound)
 		return
@@ -99,13 +101,13 @@ func handleAAIONotification(db *gorm.DB, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := updatePaymentStatusInDB(db, payment.OrderID, "success"); err != nil {
+	if err := database.UpdatePaymentStatusInDB(db, payment.OrderID, "success"); err != nil {
 		log.Printf("Error updating payment status: %v", err)
 		http.Error(w, "Error updating payment status", http.StatusInternalServerError)
 		return
 	}
 
-	if err := UpdateUserBalance(db, int64(payment.ChatID), payment.Amount); err != nil {
+	if err := database.UpdateUserBalance(db, int64(payment.ChatID), payment.Amount); err != nil {
 		log.Printf("balance %v", payment.Amount)
 		log.Printf("Error updating user balance: %v", err)
 		http.Error(w, "Error updating user balance", http.StatusInternalServerError)

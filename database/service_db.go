@@ -261,7 +261,7 @@ func updateService(tx *gorm.DB, newService models.Services) error {
 	return nil
 }
 
-func updateOrdersPeriodically(db *gorm.DB, done chan bool) {
+func UpdateOrdersPeriodically(db *gorm.DB, done chan bool) {
 	for {
 		serviceDetails, err := api.FetchOrders()
 		if err != nil {

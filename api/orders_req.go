@@ -16,7 +16,7 @@ import (
 )
 
 var apiOrdersEndpoint string
-var token string
+var Token string
 
 func init() {
 	// Загрузка переменных окружения
@@ -26,7 +26,7 @@ func init() {
 
 	// Инициализация глобальных переменных
 	apiOrdersEndpoint = os.Getenv("API_ORDERS_ENDPOINT")
-	token = os.Getenv("STAGESMM_TOKEN")
+	Token = os.Getenv("STAGESMM_TOKEN")
 }
 func FetchOrders() ([]models.ServiceDetails, error) {
 
@@ -36,7 +36,7 @@ func FetchOrders() ([]models.ServiceDetails, error) {
 		return nil, err
 	}
 
-	req.Header.Add("Authorization", token)
+	req.Header.Add("Authorization", Token)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -128,7 +128,7 @@ func GetCurrencyRate() (float64, error) {
 		return 0, err
 	}
 
-	req.Header.Add("Authorization", token)
+	req.Header.Add("Authorization", Token)
 
 	resp, err := client.Do(req)
 	if err != nil {

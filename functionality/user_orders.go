@@ -23,17 +23,17 @@ type UserStatus struct {
 	OrderID          string
 }
 
-var userStatuses map[int64]*UserStatus = make(map[int64]*UserStatus)
+var UserStatuses map[int64]*UserStatus = make(map[int64]*UserStatus)
 
 func GetUserStatus(chatID int64) *UserStatus {
-	if status, exists := userStatuses[chatID]; exists {
+	if status, exists := UserStatuses[chatID]; exists {
 		return status
 	}
-	userStatuses[chatID] = &UserStatus{ChatID: chatID}
-	return userStatuses[chatID]
+	UserStatuses[chatID] = &UserStatus{ChatID: chatID}
+	return UserStatuses[chatID]
 }
 
-func HandleOrderCommand(bot *tgbotapi.BotAPI, chatID int64, service Services) {
+func HandleOrderCommand(bot *tgbotapi.BotAPI, chatID int64, service models.Services) {
 	userStatus := GetUserStatus(chatID)
 	userStatus.CurrentState = "awaitingLink"
 	userStatus.PendingServiceID = strconv.Itoa(service.ID)
@@ -53,7 +53,7 @@ func IsValidURL(url string) bool {
 	return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
 }
 
-func HandleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, service Services) {
+func HandleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, service models.Services) {
 	chatID := update.Message.Chat.ID
 	userStatus := GetUserStatus(chatID)
 
@@ -115,10 +115,10 @@ func HandleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 			)
 			var infoMsg string
 			if userCurrency == "RUB" {
-				cost = convertAmount(cost, currencyRate, true)
-				infoMsg = fmt.Sprintf("Цена услуги: ₽%.*f. Ваш баланс: ₽%.*f.", decimalPlaces, cost, decimalPlaces, convertAmount(user.Balance, currencyRate, true))
+				cost = ConvertAmount(cost, currencyRate, true)
+				infoMsg = fmt.Sprintf("Цена услуги: ₽%.*f. Ваш баланс: ₽%.*f.", DecimalPlaces, cost, DecimalPlaces, ConvertAmount(user.Balance, currencyRate, true))
 			} else {
-				infoMsg = fmt.Sprintf("Цена услуги: $%.*f. Ваш баланс: $%.*f.", decimalPlaces, cost, decimalPlaces, user.Balance)
+				infoMsg = fmt.Sprintf("Цена услуги: $%.*f. Ваш баланс: $%.*f.", DecimalPlaces, cost, DecimalPlaces, user.Balance)
 			}
 			msg := tgbotapi.NewMessage(chatID, infoMsg)
 			msg.ReplyMarkup = cancelKeyboard
@@ -140,10 +140,10 @@ func HandleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 			)
 			var infoMsg string
 			if userCurrency == "RUB" {
-				cost = convertAmount(cost, currencyRate, true)
-				infoMsg = fmt.Sprintf("На вашем балансе недостаточно средств. Цена услуги: ₽%.*f. Ваш баланс: ₽%.*f.", decimalPlaces, cost, decimalPlaces, convertAmount(user.Balance, currencyRate, true))
+				cost = ConvertAmount(cost, currencyRate, true)
+				infoMsg = fmt.Sprintf("На вашем балансе недостаточно средств. Цена услуги: ₽%.*f. Ваш баланс: ₽%.*f.", DecimalPlaces, cost, DecimalPlaces, ConvertAmount(user.Balance, currencyRate, true))
 			} else {
-				infoMsg = fmt.Sprintf("Цена услуги: $%.*f. Ваш баланс: $%.*f.", decimalPlaces, cost, decimalPlaces, user.Balance)
+				infoMsg = fmt.Sprintf("Цена услуги: $%.*f. Ваш баланс: $%.*f.", DecimalPlaces, cost, DecimalPlaces, user.Balance)
 			}
 			msg := tgbotapi.NewMessage(chatID, infoMsg)
 			msg.ReplyMarkup = cancelKeyboard
@@ -153,15 +153,15 @@ func HandleUserInput(db *gorm.DB, bot *tgbotapi.BotAPI, update tgbotapi.Update, 
 	}
 }
 
-func handlePurchase(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, service Services) {
-	userStatus, exists := userStatuses[chatID]
+func HandlePurchase(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, service models.Services) {
+	userStatus, exists := UserStatuses[chatID]
 	if !exists {
 		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при оформлении заказа. Пожалуйста, попробуйте снова."))
 		return
 	}
 	userStatus.PendingServiceID = strconv.Itoa(service.ID)
 
-	var user UserState
+	var user models.UserState
 	if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {
 		bot.Send(tgbotapi.NewMessage(chatID, "Произошла ошибка при доступе к вашему балансу."))
 		return
@@ -175,21 +175,21 @@ func handlePurchase(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, service Ser
 	user.Balance -= cost
 	db.Save(&user)
 
-	order := Order{
+	order := models.Order{
 		ServiceID: userStatus.PendingServiceID,
 		Link:      userStatus.Link,
 		Quantity:  userStatus.Quantity,
 	}
 
 	// Отправка заказа
-	createdOrder, err := createOrder(order, token)
+	createdOrder, err := api.CreateOrder(order, api.Token)
 	if err != nil {
 		user.Balance += cost
 		bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Ошибка при создании заказа: %s", err.Error())))
 		return
 	}
 
-	db.Model(&UserOrders{}).Create(map[string]interface{}{
+	db.Model(&models.UserOrders{}).Create(map[string]interface{}{
 		"ChatID":     strconv.FormatInt(chatID, 10),
 		"ServiceID":  createdOrder.ServiceID,
 		"Cost":       createdOrder.Cost,
@@ -207,6 +207,6 @@ func handlePurchase(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, service Ser
 
 	// Отправка подтверждения пользователю
 	bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Заказ успешно создан. ID услуги: %s", createdOrder.ServiceID)))
-	delete(userStatuses, chatID)
-	sendKeyboardAfterOrder(bot, chatID)
+	delete(UserStatuses, chatID)
+	SendKeyboardAfterOrder(bot, chatID)
 }

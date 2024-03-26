@@ -9,6 +9,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Cekretik/BoostBot/api"
+	"github.com/Cekretik/BoostBot/database"
+	"github.com/Cekretik/BoostBot/functionality"
 	"github.com/Cekretik/BoostBot/models"
 	tgbotapi "github.com/Cekretik/telegram-bot-api-master"
 	"github.com/joho/godotenv"
@@ -39,7 +42,7 @@ type CreatePaymentRequest struct {
 	Currency string  `json:"currency"`
 }
 
-var userPaymentStatuses map[int64]*UserPaymentStatus = make(map[int64]*UserPaymentStatus)
+var UserPaymentStatuses map[int64]*UserPaymentStatus = make(map[int64]*UserPaymentStatus)
 
 type CryptomusWebhookData struct {
 	Type              string `json:"type"`
@@ -68,7 +71,7 @@ type CryptomusWebhookData struct {
 	Sign string `json:"sign"`
 }
 
-func handleReplenishCommand(bot *tgbotapi.BotAPI, chatID int64) {
+func HandleReplenishCommand(bot *tgbotapi.BotAPI, chatID int64) {
 	userPaymentStatus := updateUserStatus(chatID)
 	userPaymentStatus.CurrentState = "awaitingPaymentSystem"
 
@@ -104,13 +107,13 @@ func handleReplenishCommand(bot *tgbotapi.BotAPI, chatID int64) {
 	bot.Send(msg)
 }
 
-func handleCryptomusButton(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
+func HandleCryptomusButton(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	userPaymentStatus := updateUserStatus(chatID)
 	userPaymentStatus.CurrentState = "awaitingAmount"
 	log.Printf("chuba %v", userPaymentStatus)
 	userPaymentStatus.OrderID = createOrderID(chatID, time.Now().Unix())
 
-	var user UserState
+	var user models.UserState
 	if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {
 		log.Printf("Error fetching user state: %v", err)
 		bot.Send(tgbotapi.NewMessage(chatID, "Произошла ошибка."))
@@ -133,13 +136,13 @@ func handleCryptomusButton(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	bot.Send(msg)
 }
 
-func handleAAIOButton(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
+func HandleAAIOButton(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	userPaymentStatus := updateUserStatus(chatID)
 	userPaymentStatus.CurrentState = "awaitingAmountAAIO"
 	orderID := createOrderID(chatID, time.Now().Unix())
 	userPaymentStatus.OrderID = orderID
 
-	var user UserState
+	var user models.UserState
 	if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {
 		log.Printf("Error fetching user state: %v", err)
 		bot.Send(tgbotapi.NewMessage(chatID, "Произошла ошибка."))
@@ -160,13 +163,13 @@ func handleAAIOButton(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	msg := tgbotapi.NewMessage(chatID, msgText)
 	msg.ReplyMarkup = cancelKeyboard
 	bot.Send(msg)
-	userPaymentStatuses[chatID] = userPaymentStatus
+	UserPaymentStatuses[chatID] = userPaymentStatus
 }
-func handlePaymentInput(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amountText string) {
+func HandlePaymentInput(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amountText string) {
 	userPaymentStatus := updateUserStatus(chatID)
 
 	if userPaymentStatus.CurrentState == "awaitingAmount" {
-		var user UserState
+		var user models.UserState
 		if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {
 			log.Printf("Error fetching user state: %v", err)
 			return
@@ -175,7 +178,7 @@ func handlePaymentInput(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amountT
 		amount, err := strconv.ParseFloat(amountText, 64)
 		if err != nil || amount <= 0 {
 			msg := tgbotapi.NewMessage(chatID, "Введите корректную сумму.")
-			userPaymentStatuses[chatID] = userPaymentStatus
+			UserPaymentStatuses[chatID] = userPaymentStatus
 			cancelKeyboard := tgbotapi.NewReplyKeyboard(
 				tgbotapi.NewKeyboardButtonRow(
 					tgbotapi.NewKeyboardButton("Отмена"),
@@ -187,19 +190,19 @@ func handlePaymentInput(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amountT
 		}
 
 		if user.Currency == "RUB" {
-			rate := getCurrentCurrencyRate()
-			amount = convertAmount(amount, rate, false)
+			rate := api.GetCurrentCurrencyRate()
+			amount = functionality.ConvertAmount(amount, rate, false)
 		}
 
-		userPaymentStatuses[chatID] = userPaymentStatus
-		createAndSendPaymentLink(db, bot, chatID, amount, userPaymentStatus.OrderID, time.Now().Unix())
+		UserPaymentStatuses[chatID] = userPaymentStatus
+		CreateAndSendPaymentLink(db, bot, chatID, amount, userPaymentStatus.OrderID, time.Now().Unix())
 	}
 }
 
-func handlePaymentInputAAIO(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amountText string) {
+func HandlePaymentInputAAIO(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amountText string) {
 	userPaymentStatus := updateUserStatus(chatID)
 	if userPaymentStatus.CurrentState == "awaitingAmountAAIO" {
-		var user UserState
+		var user models.UserState
 		if err := db.Where("user_id = ?", chatID).First(&user).Error; err != nil {
 			log.Printf("Error fetching user state: %v", err)
 			return
@@ -208,7 +211,7 @@ func handlePaymentInputAAIO(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amo
 		amount, err := strconv.ParseFloat(amountText, 64)
 		if err != nil || amount <= 0 {
 			msg := tgbotapi.NewMessage(chatID, "Введите корректную сумму.")
-			userPaymentStatuses[chatID] = userPaymentStatus
+			UserPaymentStatuses[chatID] = userPaymentStatus
 			cancelKeyboard := tgbotapi.NewReplyKeyboard(
 				tgbotapi.NewKeyboardButtonRow(
 					tgbotapi.NewKeyboardButton("Отмена"),
@@ -227,17 +230,17 @@ func handlePaymentInputAAIO(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amo
 		}
 		createAndSendPaymentLinkAAIO(db, bot, chatID, amount, userPaymentStatus.OrderID, time.Now().Unix(), currency)
 		userPaymentStatus.CurrentState = ""
-		userPaymentStatuses[chatID] = userPaymentStatus
+		UserPaymentStatuses[chatID] = userPaymentStatus
 	}
 }
-func createAndSendPaymentLink(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amount float64, orderID string, timestamp int64) {
+func CreateAndSendPaymentLink(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amount float64, orderID string, timestamp int64) {
 	paymentResponse, err := CreatePayment(fmt.Sprintf("%.4f", amount), "USD", orderID)
 	if err != nil {
 		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при создании платежа."))
 		return
 	}
 
-	newPayment := Payments{
+	newPayment := models.Payments{
 		ChatID:  int(chatID),
 		OrderID: orderID,
 		Amount:  amount,
@@ -259,15 +262,15 @@ func createAndSendPaymentLink(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, a
 		msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Для пополнения на сумму $%.4f нажмите на кнопку оплатить:", amount))
 		msg.ReplyMarkup = inlineKeyboard
 		bot.Send(msg)
-		delete(userPaymentStatuses, chatID)
-		sendStandardKeyboardAfterPayment(bot, chatID)
+		delete(UserPaymentStatuses, chatID)
+		functionality.SendStandardKeyboardAfterPayment(bot, chatID)
 	}
 }
 func createAndSendPaymentLinkAAIO(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, amount float64, orderID string, timestamp int64, currency string) {
 	originalAmount := amount
 	if currency == "RUB" {
-		rate := getCurrentCurrencyRate()
-		amount = convertAmount(originalAmount, rate, false)
+		rate := api.GetCurrentCurrencyRate()
+		amount = functionality.ConvertAmount(originalAmount, rate, false)
 	}
 
 	paymentURL, err := CreateAAIOPayment(fmt.Sprintf("%.2f", originalAmount), orderID, currency, "Пополнение баланса", "", "ru")
@@ -276,7 +279,7 @@ func createAndSendPaymentLinkAAIO(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int6
 		return
 	}
 
-	newPayment := Payments{
+	newPayment := models.Payments{
 		ChatID:  int(chatID),
 		OrderID: orderID,
 		Amount:  amount,
@@ -300,8 +303,8 @@ func createAndSendPaymentLinkAAIO(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int6
 	msg := tgbotapi.NewMessage(chatID, paymentMessage)
 	msg.ReplyMarkup = inlineKeyboard
 	bot.Send(msg)
-	delete(userPaymentStatuses, chatID)
-	sendStandardKeyboardAfterPayment(bot, chatID)
+	delete(UserPaymentStatuses, chatID)
+	functionality.SendStandardKeyboardAfterPayment(bot, chatID)
 }
 func handleWebhook(db *gorm.DB, w http.ResponseWriter, r *http.Request) {
 	var webhookData CryptomusWebhookData
@@ -314,7 +317,7 @@ func handleWebhook(db *gorm.DB, w http.ResponseWriter, r *http.Request) {
 	}
 
 	orderID := webhookData.OrderID
-	var payment Payments
+	var payment models.Payments
 	if err := db.Where("order_id = ?", orderID).First(&payment).Error; err != nil {
 		log.Printf("Error retrieving payment: %v", err)
 		return
@@ -323,8 +326,8 @@ func handleWebhook(db *gorm.DB, w http.ResponseWriter, r *http.Request) {
 	switch webhookData.PaymentStatus {
 	case "paid":
 		if payment.Status != "paid" {
-			updatePaymentStatusInDB(db, orderID, "paid")
-			err = UpdateUserBalance(db, int64(payment.ChatID), payment.Amount)
+			database.UpdatePaymentStatusInDB(db, orderID, "paid")
+			err = database.UpdateUserBalance(db, int64(payment.ChatID), payment.Amount)
 			if err != nil {
 				log.Printf("Error updating user balance: %v", err)
 			}
@@ -337,11 +340,11 @@ func handleWebhook(db *gorm.DB, w http.ResponseWriter, r *http.Request) {
 }
 
 func updateUserStatus(chatID int64) *UserPaymentStatus {
-	if status, exists := userPaymentStatuses[chatID]; exists {
-		if isOrderExpired(status) {
+	if status, exists := UserPaymentStatuses[chatID]; exists {
+		if IsOrderExpired(status) {
 			status.OrderID = createOrderID(chatID, time.Now().Unix())
 			status.PaymentStatus = "cancel"
-			userPaymentStatuses[chatID] = status
+			UserPaymentStatuses[chatID] = status
 		}
 		return status
 	}
@@ -350,7 +353,7 @@ func updateUserStatus(chatID int64) *UserPaymentStatus {
 		OrderID:       createOrderID(chatID, time.Now().Unix()),
 		PaymentStatus: "",
 	}
-	userPaymentStatuses[chatID] = newUserStatus
+	UserPaymentStatuses[chatID] = newUserStatus
 	return newUserStatus
 }
 
@@ -425,7 +428,7 @@ func createOrderID(chatID int64, timestamp int64) string {
 	return fmt.Sprintf("order_%d_%d", chatID, timestamp)
 }
 
-func startHTTPServer(db *gorm.DB) {
+func StartHTTPServer(db *gorm.DB) {
 	// Существующие обработчики
 	http.HandleFunc("/webhook", func(w http.ResponseWriter, r *http.Request) {
 		handleWebhook(db, w, r)

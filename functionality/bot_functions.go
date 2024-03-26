@@ -16,7 +16,7 @@ import (
 
 var DecimalPlaces = 4
 
-func convertAmount(amount float64, rate float64, toRUB bool) float64 {
+func ConvertAmount(amount float64, rate float64, toRUB bool) float64 {
 	if toRUB {
 		return amount * rate
 	} else {
@@ -24,7 +24,7 @@ func convertAmount(amount float64, rate float64, toRUB bool) float64 {
 	}
 }
 
-func translateOrderStatus(status string) string {
+func TranslateOrderStatus(status string) string {
 	switch status {
 	case "PENDING":
 		return "Ожидание"
@@ -41,7 +41,7 @@ func translateOrderStatus(status string) string {
 	}
 }
 
-func handleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
+func HandleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
 	var userState models.UserState
 	if err := db.Where("user_id = ?", userID).First(&userState).Error; err != nil {
 		log.Printf("Error fetching user state: %v", err)
@@ -58,7 +58,7 @@ func handleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
 	var balanceMsgText string
 
 	if userState.Currency == "RUB" {
-		balance = convertAmount(balance, rate, true)
+		balance = ConvertAmount(balance, rate, true)
 		balanceMsgText = fmt.Sprintf("💳 Ваш баланс: ₽%.*f", DecimalPlaces, balance)
 	} else {
 		balanceMsgText = fmt.Sprintf("💳 Ваш баланс: $%.*f", DecimalPlaces, balance)
@@ -79,7 +79,7 @@ func handleBalanceCommand(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB) {
 	bot.Send(msg)
 }
 
-func handleProfileCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
+func HandleProfileCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	var userState models.UserState
 	if err := db.Where("user_id = ?", chatID).First(&userState).Error; err != nil {
 		log.Printf("Error fetching user state: %v", err)
@@ -93,7 +93,7 @@ func handleProfileCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	balance := userState.Balance
 	var messageText string
 	if userState.Currency == "RUB" {
-		balance = convertAmount(balance, rate, true)
+		balance = ConvertAmount(balance, rate, true)
 		messageText = fmt.Sprintf("🤵‍♂️ Пользователь:%v\n 🔎 ID:%v\n 💳 Ваш баланс:₽%.*f", userState.UserName, userState.UserID, DecimalPlaces, balance)
 	} else {
 		messageText = fmt.Sprintf("🤵‍♂️ Пользователь:%v\n 🔎 ID:%v\n 💳 Ваш баланс:$%.*f", userState.UserName, userState.UserID, DecimalPlaces, balance)
@@ -112,7 +112,7 @@ func handleProfileCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	bot.Send(msg)
 }
 
-func handleOrdersCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
+func HandleOrdersCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	var userOrders []models.UserOrders
 	chatIDString := strconv.FormatInt(chatID, 10)
 	result := db.Where("user_id = ?", chatIDString).Find(&userOrders)
@@ -130,7 +130,7 @@ func handleOrdersCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 
 	messageText := "📝 Ваши заказы:\n\n"
 	for _, order := range userOrders {
-		status := translateOrderStatus(order.Status)
+		status := TranslateOrderStatus(order.Status)
 		messageText += fmt.Sprintf("Номер услуги: %s\nСсылка: %s\nКоличество: %d\nСтатус: %s\n\n",
 			order.ServiceID, order.Link, order.Quantity, status)
 	}
@@ -149,7 +149,7 @@ func GiveSubscriptionBonus(bot *tgbotapi.BotAPI, db *gorm.DB, userState *models.
 	userState.IsNewUser = false
 }
 
-func handleFavoritesCommand(bot *tgbotapi.BotAPI, db *gorm.DB, chatID int64) {
+func HandleFavoritesCommand(bot *tgbotapi.BotAPI, db *gorm.DB, chatID int64) {
 	favorites, err := database.GetUserFavorites(db, chatID)
 	if err != nil || len(favorites) == 0 {
 		bot.Send(tgbotapi.NewMessage(chatID, "В избранном пока нет услуг."))
@@ -193,7 +193,7 @@ func ShowReferralStats(bot *tgbotapi.BotAPI, db *gorm.DB, userID int64) {
 	bot.Send(msg)
 }
 
-func handleChangeCurrency(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB, toRUB bool) {
+func HandleChangeCurrency(bot *tgbotapi.BotAPI, userID int64, db *gorm.DB, toRUB bool) {
 	var user models.UserState
 	err := db.Where("user_id = ?", userID).First(&user).Error
 	if err != nil {
@@ -227,7 +227,7 @@ func FormatServiceInfo(service models.Services, subcategory models.Subcategory, 
 	increasedRate := service.Rate + service.Rate*(increasePercent/100)
 
 	if userCurrency == "RUB" {
-		increasedRate = convertAmount(increasedRate, currencyRate, true)
+		increasedRate = ConvertAmount(increasedRate, currencyRate, true)
 		currencySymbol := "₽"
 		return fmt.Sprintf(
 			"ℹ️ Информация об услуге\n\n"+

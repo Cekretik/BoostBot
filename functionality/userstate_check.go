@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 
+	"github.com/Cekretik/BoostBot/models"
 	tgbotapi "github.com/Cekretik/telegram-bot-api-master"
 	"gorm.io/gorm"
 )
@@ -38,11 +39,11 @@ func CheckSubscriptionStatus(bot *tgbotapi.BotAPI, db *gorm.DB, channelID, userI
 }
 
 func UpdateUserStatus(bot *tgbotapi.BotAPI, db *gorm.DB, channelID int64, userID int64, subscribed bool, balance float64, userName string) error {
-	var userState UserState
+	var userState models.UserState
 	result := db.Where("user_id = ? AND channel_id = ?", userID, channelID).First(&userState)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			userState = UserState{
+			userState = models.UserState{
 				UserID:               userID,
 				UserName:             userName,
 				ChannelID:            channelID,

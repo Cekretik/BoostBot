@@ -28,9 +28,9 @@ type Entity struct {
 	Length int
 }
 
-var userPromoStatuses = make(map[int64]*UserPromoStatus)
+var UserPromoStatuses = make(map[int64]*UserPromoStatus)
 
-func convertEntities(tgEntities []tgbotapi.MessageEntity) []Entity {
+func ConvertEntities(tgEntities []tgbotapi.MessageEntity) []Entity {
 	var entities []Entity
 	for _, e := range tgEntities {
 		entities = append(entities, Entity{
@@ -43,14 +43,14 @@ func convertEntities(tgEntities []tgbotapi.MessageEntity) []Entity {
 	return entities
 }
 
-func handlePromoCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
+func HandlePromoCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	messageText := "✍️Введите ваш промокод:"
 	cancelKeyboard := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton("Отмена"),
 		),
 	)
-	userPromoStatuses[chatID] = &UserPromoStatus{
+	UserPromoStatuses[chatID] = &UserPromoStatus{
 		ChatID:     chatID,
 		PromoState: "awaitingPromoCode",
 	}
@@ -60,9 +60,9 @@ func handlePromoCommand(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 
 }
 
-func processPromoCodeInput(bot *tgbotapi.BotAPI, chatID int64, promoCode string, db *gorm.DB) {
+func ProcessPromoCodeInput(bot *tgbotapi.BotAPI, chatID int64, promoCode string, db *gorm.DB) {
 	if promoCode == "Отмена" {
-		sendStandardKeyboard(bot, chatID)
+		SendStandardKeyboard(bot, chatID)
 		return
 	}
 
@@ -114,8 +114,8 @@ func processPromoCodeInput(bot *tgbotapi.BotAPI, chatID int64, promoCode string,
 	bot.Send(msg)
 }
 
-func handleCreatePromoCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *gorm.DB) {
-	if !isAdmin(bot, int64(update.Message.From.ID)) {
+func HandleCreatePromoCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *gorm.DB) {
+	if !IsAdmin(bot, int64(update.Message.From.ID)) {
 		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "У вас нет прав доступа к этой команде."))
 		return
 	}
@@ -155,7 +155,7 @@ func handleCreatePromoCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *
 
 	bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Промокод создан: %s", promo.Code)))
 }
-func isAdmin(bot *tgbotapi.BotAPI, userID int64) bool {
+func IsAdmin(bot *tgbotapi.BotAPI, userID int64) bool {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -181,13 +181,13 @@ func isAdmin(bot *tgbotapi.BotAPI, userID int64) bool {
 	return member.Status == "administrator" || member.Status == "creator"
 }
 
-func handleCreateUrlCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *gorm.DB) {
+func HandleCreateUrlCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *gorm.DB) {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
 	botLink := os.Getenv("BOT_LINK")
-	if !isAdmin(bot, int64(update.Message.From.ID)) {
+	if !IsAdmin(bot, int64(update.Message.From.ID)) {
 		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "У вас не достаточно прав"))
 		return
 	}
@@ -231,7 +231,7 @@ func handleCreateUrlCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *go
 func GenerateSpecialLink(linkName string) string {
 	return fmt.Sprint(linkName) + "_"
 }
-func processSpecialLink(bot *tgbotapi.BotAPI, chatID int64, linkCode string, db *gorm.DB) {
+func ProcessSpecialLink(bot *tgbotapi.BotAPI, chatID int64, linkCode string, db *gorm.DB) {
 	var promo models.PromoCode
 
 	if err := db.Where("code = ?", linkCode).First(&promo).Error; err != nil {
@@ -277,8 +277,8 @@ func processSpecialLink(bot *tgbotapi.BotAPI, chatID int64, linkCode string, db 
 	db.Create(&newUsedPromo)
 }
 
-func handleBonusCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *gorm.DB) {
-	if isAdmin(bot, int64(update.Message.From.ID)) {
+func HandleBonusCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *gorm.DB) {
+	if IsAdmin(bot, int64(update.Message.From.ID)) {
 		bonusActive = !bonusActive
 		message := "Бонус за подписку деактивирован."
 
@@ -293,8 +293,8 @@ func handleBonusCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *gorm.D
 	}
 }
 
-func handleBroadcastCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *gorm.DB) {
-	if !isAdmin(bot, int64(update.Message.From.ID)) {
+func HandleBroadcastCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *gorm.DB) {
+	if !IsAdmin(bot, int64(update.Message.From.ID)) {
 		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "У вас нет прав для выполнения этой команды."))
 		return
 	}
@@ -317,19 +317,19 @@ func handleBroadcastCommand(bot *tgbotapi.BotAPI, update tgbotapi.Update, db *go
 				shiftedEntities[i].Offset -= len(parts[0]) + 1
 			}
 		}
-		entities = convertEntities(shiftedEntities)
+		entities = ConvertEntities(shiftedEntities)
 	}
 
-	formattedMessage, err := formatBroadcastMessage(message, entities)
+	formattedMessage, err := FormatBroadcastMessage(message, entities)
 	if err != nil {
 		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка форматирования сообщения: "+err.Error()))
 		return
 	}
 
-	go broadcastMessage(bot, db, formattedMessage)
+	go BroadcastMessage(bot, db, formattedMessage)
 	bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Рассылка началась."))
 }
-func broadcastMessage(bot *tgbotapi.BotAPI, db *gorm.DB, message string) {
+func BroadcastMessage(bot *tgbotapi.BotAPI, db *gorm.DB, message string) {
 	var users []models.UserState
 	db.Find(&users).Where("previously_subscribed = ? AND subscribed = ?", true, true)
 
@@ -345,7 +345,7 @@ func broadcastMessage(bot *tgbotapi.BotAPI, db *gorm.DB, message string) {
 	log.Println("Рассылка завершена.")
 }
 
-func formatBroadcastMessage(message string, entities []Entity) (string, error) {
+func FormatBroadcastMessage(message string, entities []Entity) (string, error) {
 	var formattedMessage strings.Builder
 
 	lastIdx := 0
@@ -390,7 +390,7 @@ func formatBroadcastMessage(message string, entities []Entity) (string, error) {
 	return formattedMessage.String(), nil
 }
 
-func notifyAdminsAboutNewUser(bot *tgbotapi.BotAPI, user *tgbotapi.User, isPremium bool, db *gorm.DB) {
+func NotifyAdminsAboutNewUser(bot *tgbotapi.BotAPI, user *tgbotapi.User, isPremium bool, db *gorm.DB) {
 	if !database.UserIsNew(db, user.ID) {
 		return
 	}

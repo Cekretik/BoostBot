@@ -1,4 +1,4 @@
-package callbacks
+package functionality
 
 import (
 	"fmt"
@@ -94,7 +94,7 @@ func createServicePaginationRow(subcategoryID string, currentPage int, totalServ
 	return paginationRow
 }
 
-func handleAddToFavoritesCallback(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery *tgbotapi.CallbackQuery) {
+func HandleAddToFavoritesCallback(bot *tgbotapi.BotAPI, db *gorm.DB, callbackQuery *tgbotapi.CallbackQuery) {
 	parts := strings.Split(callbackQuery.Data, ":")
 	action := parts[0]
 	serviceIDStr := parts[1]

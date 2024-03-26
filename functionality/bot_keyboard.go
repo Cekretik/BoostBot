@@ -9,7 +9,6 @@ import (
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 
-	"github.com/Cekretik/BoostBot/callbacks"
 	"github.com/Cekretik/BoostBot/database"
 	"github.com/Cekretik/BoostBot/models"
 	tgbotapi "github.com/Cekretik/telegram-bot-api-master"
@@ -47,14 +46,14 @@ func CreateQuickReplyMarkup() tgbotapi.ReplyKeyboardMarkup {
 	)
 }
 
-func sendKeyboardAfterOrder(bot *tgbotapi.BotAPI, chatID int64) {
+func SendKeyboardAfterOrder(bot *tgbotapi.BotAPI, chatID int64) {
 	messageText := "Заказ создан, ожидайте."
 	msg := tgbotapi.NewMessage(chatID, messageText)
 	quickReplyMarkup := CreateQuickReplyMarkup()
 	msg.ReplyMarkup = quickReplyMarkup
 	bot.Send(msg)
 }
-func sendStandardKeyboard(bot *tgbotapi.BotAPI, chatID int64) {
+func SendStandardKeyboard(bot *tgbotapi.BotAPI, chatID int64) {
 	messageText := "Отменено"
 	msg := tgbotapi.NewMessage(chatID, messageText)
 	quickReplyMarkup := CreateQuickReplyMarkup()
@@ -62,14 +61,14 @@ func sendStandardKeyboard(bot *tgbotapi.BotAPI, chatID int64) {
 	bot.Send(msg)
 }
 
-func sendStandardKeyboardAfterPayment(bot *tgbotapi.BotAPI, chatID int64) {
+func SendStandardKeyboardAfterPayment(bot *tgbotapi.BotAPI, chatID int64) {
 	messageText := "После оплаты проверьте баланс."
 	msg := tgbotapi.NewMessage(chatID, messageText)
 	quickReplyMarkup := CreateQuickReplyMarkup()
 	msg.ReplyMarkup = quickReplyMarkup
 	bot.Send(msg)
 }
-func techSupMessage(bot *tgbotapi.BotAPI, chatID int64) {
+func TechSupMessage(bot *tgbotapi.BotAPI, chatID int64) {
 	channelLink := "https://t.me/DARRINAN00"
 	messageText := "Техническая поддержка: "
 	msg := tgbotapi.NewMessage(chatID, messageText)
@@ -84,7 +83,7 @@ func techSupMessage(bot *tgbotapi.BotAPI, chatID int64) {
 	bot.Send(msg)
 }
 
-func sendSettingsKeyboard(bot *tgbotapi.BotAPI, chatID int64) {
+func SendSettingsKeyboard(bot *tgbotapi.BotAPI, chatID int64) {
 	messageText := "⚙️Сменить валюту на:"
 	msg := tgbotapi.NewMessage(chatID, messageText)
 
@@ -149,7 +148,7 @@ func SendPromotionMessage(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	}
 	categoryID := ""
 
-	totalPages, err := callbacks.GetTotalPagesForCategory(db, callbacks.ItemsPerPage, categoryID)
+	totalPages, err := GetTotalPagesForCategory(db, ItemsPerPage, categoryID)
 	if err != nil {
 		log.Println("Error getting total pages:", err)
 		return
@@ -190,13 +189,13 @@ func SendPromotionMessage(bot *tgbotapi.BotAPI, chatID int64, db *gorm.DB) {
 	}
 
 	subcategoryID := ""
-	totalServicePages, err := callbacks.GetTotalPagesForService(db, callbacks.ItemsPerPage, categoryID)
+	totalServicePages, err := GetTotalPagesForService(db, ItemsPerPage, categoryID)
 	if err != nil {
 		log.Println("Error getting total pages:", err)
 		return
 	}
 
-	services, err := callbacks.GetServicesBySubcategoryID(db, subcategoryID)
+	services, err := database.GetServicesBySubcategoryID(db, subcategoryID)
 	if err != nil {
 		log.Println("Error getting services:", err)
 		return
@@ -223,12 +222,12 @@ func CreateCategoryKeyboard(db *gorm.DB) (tgbotapi.InlineKeyboardMarkup, error) 
 
 	categoryNames := []string{"Telegram", "YouTube", "Instagram", "TikTok", "Twitter"}
 
-	categories, err := GetCategoriesFromDB(db)
+	categories, err := database.GetCategoriesFromDB(db)
 	if err != nil {
 		return tgbotapi.InlineKeyboardMarkup{}, err
 	}
 
-	categoryMap := make(map[string]Category)
+	categoryMap := make(map[string]models.Category)
 	for _, category := range categories {
 		categoryMap[category.Name] = category
 	}
@@ -262,7 +261,7 @@ func CreateSubcategoryKeyboard(db *gorm.DB, categoryID, currentPage, totalPages 
 		return tgbotapi.InlineKeyboardMarkup{}, err
 	}
 
-	startIdx, endIdx := callbacks.calculatePageRange(len(subcategories), callbacks.itemsPerPage, currentPage)
+	startIdx, endIdx := calculatePageRange(len(subcategories), ItemsPerPage, currentPage)
 
 	for i := startIdx; i < endIdx; i++ {
 		subcategory := subcategories[i]
@@ -281,7 +280,7 @@ func CreateSubcategoryKeyboard(db *gorm.DB, categoryID, currentPage, totalPages 
 		return tgbotapi.InlineKeyboardMarkup{}, err
 	}
 
-	paginationRow := callbacks.createPaginationRow(categoryID, currentPageInt, totalPagesInt)
+	paginationRow := createPaginationRow(categoryID, currentPageInt, totalPagesInt)
 	rows = append(rows, paginationRow)
 
 	return tgbotapi.NewInlineKeyboardMarkup(rows...), nil
@@ -295,7 +294,7 @@ func CreateServiceKeyboard(db *gorm.DB, subcategoryID, currentPage, totalService
 		return tgbotapi.InlineKeyboardMarkup{}, err
 	}
 
-	startIdx, endIdx := callbacks.calculatePageRange(len(services), callbacks.itemsPerPage, currentPage)
+	startIdx, endIdx := calculatePageRange(len(services), ItemsPerPage, currentPage)
 
 	for i := startIdx; i < endIdx; i++ {
 		service := services[i]
@@ -316,7 +315,7 @@ func CreateServiceKeyboard(db *gorm.DB, subcategoryID, currentPage, totalService
 	}
 	backToSubcategoriesButton := tgbotapi.NewInlineKeyboardButtonData("🔙 Вернуться к категориям", fmt.Sprintf("backToSubcategories:%s", subcategoryID))
 	rows = append(rows, []tgbotapi.InlineKeyboardButton{backToSubcategoriesButton})
-	paginationRow := callbacks.createServicePaginationRow(subcategoryID, currentPageInt, totalServicePagesInt)
+	paginationRow := createServicePaginationRow(subcategoryID, currentPageInt, totalServicePagesInt)
 	rows = append(rows, paginationRow)
 
 	return tgbotapi.NewInlineKeyboardMarkup(rows...), nil

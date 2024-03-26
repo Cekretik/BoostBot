@@ -126,3 +126,14 @@ type UsedPromoCode struct {
 	PromoCode string `gorm:"column:promo_code"`
 	Used      bool   `gorm:"column:used"`
 }
+
+type BotOwners struct {
+	gorm.Model
+	ID       int64   `gorm:"column:id" json:"id"`
+	UserName string  `gorm:"column:user_name" json:"user_name"`
+	UserID   int64   `gorm:"primaryKey column:user_id"`
+	Token    string  `gorm:"column:token" json:"token"`
+	Running  bool    `gorm:"column:running" json:"running"`
+	BotName  string  `gorm:"column:bot_name" json:"bot_name"`
+	Balance  float64 `gorm:"column:balance" json:"balance"`
+}
